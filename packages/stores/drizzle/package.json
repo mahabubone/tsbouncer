@@ -1,0 +1,56 @@
+{
+  "name": "@tsbouncer/drizzle",
+  "version": "0.0.0",
+  "description": "KeymanStore over an application-owned Drizzle instance.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20.11"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "authorization",
+    "authz",
+    "store",
+    "drizzle",
+    "sql",
+    "esm"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "pack:check": "publint --strict && attw --pack . --profile esm-only"
+  },
+  "peerDependencies": {
+    "drizzle-orm": ">=0.36"
+  },
+  "dependencies": {
+    "@tsbouncer/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "0.18.5",
+    "@tsbouncer/testkit": "workspace:*",
+    "@vitest/coverage-v8": "5.0.2",
+    "better-sqlite3": "13.0.3",
+    "@types/better-sqlite3": "7.6.13",
+    "drizzle-orm": "0.45.3",
+    "publint": "0.3.24",
+    "tsup": "8.5.1",
+    "typescript": "5.9.3",
+    "vitest": "5.0.2",
+    "@libsql/client": "0.15.15"
+  }
+}

@@ -33,6 +33,11 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Generate Prisma client
+        # Prisma's client is generated, not published as source. The store's own
+        # `test` script also regenerates, but `build`/`pack:check` need it to exist.
+        run: pnpm --filter @tsbouncer/prisma exec prisma generate --schema prisma/schema.prisma
+
       - name: Lint
         run: pnpm lint
 

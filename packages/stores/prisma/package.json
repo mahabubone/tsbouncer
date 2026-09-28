@@ -1,0 +1,57 @@
+{
+  "name": "@tsbouncer/prisma",
+  "version": "0.0.0",
+  "description": "KeymanStore over an application-owned Prisma client. Requires Prisma 7+.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20.11"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "authorization",
+    "authz",
+    "store",
+    "prisma",
+    "sql",
+    "esm"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "prisma generate --schema prisma/schema.prisma && vitest run",
+    "test:coverage": "prisma generate --schema prisma/schema.prisma && vitest run --coverage",
+    "pack:check": "publint --strict && attw --pack . --profile esm-only"
+  },
+  "peerDependencies": {
+    "@prisma/client": ">=7"
+  },
+  "dependencies": {
+    "@tsbouncer/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "0.18.5",
+    "@prisma/adapter-better-sqlite3": "7.10.0",
+    "@prisma/client": "7.10.0",
+    "@tsbouncer/testkit": "workspace:*",
+    "@types/better-sqlite3": "7.6.13",
+    "@vitest/coverage-v8": "5.0.2",
+    "better-sqlite3": "13.0.3",
+    "prisma": "7.10.0",
+    "publint": "0.3.24",
+    "tsup": "8.5.1",
+    "typescript": "5.9.3",
+    "vitest": "5.0.2"
+  }
+}

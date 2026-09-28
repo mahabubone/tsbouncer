@@ -17,7 +17,15 @@
 | `explain()` | JSON-serializable tree + text formatter |
 | v0.1 eval scope | direct, userset, wildcards, union/intersection/**exclusion**, **TTU**, **conditions** |
 | Typing | Pragmatic — brand + runtime validate + permission-string autocomplete |
-| Out of scope | CLI, codegen, bundler, Kysely/Drizzle/Prisma, Redis/Mongo/TypeORM, cache, full compile-time inference, any framework adapter |
+| SQL stores | Kysely, Drizzle, Prisma as Tier 1 (promoted from v0.2 — see below) |
+| Out of scope | CLI, codegen, bundler, Redis/Mongo/TypeORM, cache, full compile-time inference, any framework adapter |
+
+**Scope change (post-M1).** Kysely/Drizzle/Prisma were originally deferred to v0.2 and
+promoted to immediate. Two justifications: a store is independent of the evaluator, and
+the conformance suite makes a store buildable against an already-proven contract — so
+these do not block on the check engine. And IDEA.md §7 argued for them "from day one"
+as Tier 1. They still ship *before* the evaluator, which is unusual but sound: the
+contract they implement is fixed, and every one of them is verified by the same suite.
 
 ## Repo layout
 
@@ -74,9 +82,26 @@ interface KeymanStore {
 | M4 | conditions / ABAC, fail-closed | med |
 | M5 | `jsonStore` (atomic temp+rename) — makes testkit pass again | med |
 | M6 | root `tsbouncer` pkg · docs · examples · release | low |
+| S1 | `@tsbouncer/kysely` — filtered reads over the app's existing Kysely instance | med |
+| S2 | `@tsbouncer/drizzle` — same, over the app's existing Drizzle instance | med |
+| S3 | `@tsbouncer/prisma` — same, over the app's existing `PrismaClient` | med |
+
+**S1–S3 run between M1 and M2.** They implement a contract that is already fixed and
+tested, so they neither depend on nor delay the evaluator. Each must pass the same
+conformance suite, against real SQL. This is the whole return on building `testkit`
+first: eight adapters become eight runs of one suite instead of eight bespoke test
+sets.
+
+**Portability is the hard part, not the query builder.** `read()` maps to indexed
+equality, which is easy. `write` with `mode: 'insert'` needs unique-violation
+detection, and `upsert` has genuinely different SQL per dialect
+(`ON CONFLICT` vs `ON DUPLICATE KEY UPDATE` vs `INSERT OR REPLACE`). Each adapter
+must use its ORM's native per-dialect path or a transactionally correct fallback —
+never a dialect-specific incantation that silently no-ops elsewhere.
 
 **M1 before M2 deliberately:** prove the store contract with `memoryStore` + a conformance suite *before* building an engine on it. With no CLI, testkit is the primary quality gate, so it cannot come last.
 **Cut line:** M1+M2+M5+M6 is a shippable alpha if M3/M4 overrun. They're in v0.1 as you decided; this is only the escape hatch.
+**Status:** S1–S3 shipped. M2 (the check engine) is next and is not started.
 
 ## Correctness risks to design against up front
 

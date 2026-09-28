@@ -34,6 +34,9 @@ These are decided. Do not relitigate them in PRs; change `PLAN.md` deliberately 
 packages/core            @tsbouncer/core      the kernel, zero deps
 packages/stores/memory   @tsbouncer/memory
 packages/stores/json     @tsbouncer/json
+packages/stores/kysely   @tsbouncer/kysely
+packages/stores/drizzle  @tsbouncer/drizzle
+packages/stores/prisma   @tsbouncer/prisma
 packages/testkit         @tsbouncer/testkit   conformance suite
 packages/tsbouncer       tsbouncer            batteries-included re-export
 examples/                runnable, verified in CI
@@ -41,6 +44,35 @@ examples/                runnable, verified in CI
 
 `testkit` is the primary quality gate — there is no CLI. **Any new store must pass
 the full conformance suite.** A store that does not pass is not done.
+
+## SQL stores
+
+All four SQL-backed adapters (`kysely`, `drizzle`, `prisma`, and later `json`) share
+one table contract, so an application can switch adapters without migrating data:
+`subject_type` / `subject_id` / `subject_relation`, `relation`,
+`resource_type` / `resource_id`, `condition`, `context`.
+
+**`subject_relation` and `condition` are `''` when absent, never `NULL`, and both
+are `NOT NULL`.** A unique constraint over these columns is how `write({ mode:
+'insert' })` rejects duplicates; in Postgres `NULL`s compare as distinct, so a
+constraint containing a `NULL` never fires and `insert` silently stops rejecting
+duplicates.
+
+Two traps, both of which have already been paid for once:
+
+- **A reference spans three columns, so a set of references is an OR of
+  per-reference ANDs.** Independent equality tests per column match a row pairing
+  one reference's type with another's id. `['user:alice', 'user:bob']` must not
+  match a userset row.
+- **Never guess a driver or dialect; ask.** Drizzle's query builders expose `run`,
+  `all`, and `execute` on *both* sync and async drivers, so probing the builder
+  classifies every async driver as sync — which silently commits transactions
+  before their work lands. Inspect the client, and **refuse to start** rather than
+  guessing when it is unrecognised. A wrong guess loses data silently; a thrown
+  error does not.
+
+`prisma` is generated, not source: run `prisma generate` before typecheck, build, or
+pack. Its `test` script does this itself; CI does it as a separate step.
 
 ## Commands
 

@@ -1,0 +1,26 @@
+// Test-only schema. The shape here is the canonical one; users copy the
+// `TsbouncerTuple` model into their own schema and name it whatever they like.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model TsbouncerTuple {
+  id               Int    @id @default(autoincrement())
+  subjectType      String
+  subjectId        String
+  subjectRelation  String
+  relation         String
+  resourceType     String
+  resourceId       String
+  condition        String
+  context          String?
+
+  @@unique([subjectType, subjectId, subjectRelation, relation, resourceType, resourceId, condition])
+  @@index([subjectType, subjectId, relation])
+  @@index([relation, resourceType, resourceId])
+  @@index([resourceType, resourceId])
+}

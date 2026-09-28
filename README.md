@@ -102,8 +102,19 @@ import { memoryStore } from '@tsbouncer/memory';
 const authz = createKeyman({ model, store: memoryStore() });
 ```
 
-Because the contract is that small, it also runs on JSON on disk, Redis, or a SQL
-database via Kysely, Drizzle, or Prisma.
+Because the contract is that small, it also runs on JSON on disk, or on a SQL database
+through whichever query builder you already use:
+
+| package | takes | tested against |
+| --- | --- | --- |
+| `@tsbouncer/memory` | nothing — process-local | in-process |
+| `@tsbouncer/json` | a file path | on disk |
+| `@tsbouncer/kysely` | your `Kysely` instance | SQLite |
+| `@tsbouncer/drizzle` | your `db` and table object | SQLite (sync) and libsql (async) |
+| `@tsbouncer/prisma` | your `PrismaClient` | SQLite via Prisma 7 |
+
+Every store is verified by the same conformance suite. A store that does not pass it
+is not finished.
 
 ## Explain
 
