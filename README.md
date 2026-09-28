@@ -6,9 +6,8 @@ Define authorization data, relationships, and policies. `tsbouncer` evaluates ac
 — over pluggable storage, inside your application.
 
 > **Status: pre-alpha.** Nothing is published yet. The model, the store contract, five
-> stores, and the check engine are built and tested. Conditions are not yet implemented
-> and currently **deny** rather than allow. See [PLAN.md](./PLAN.md) for the milestone
-> breakdown.
+> stores, and a complete check engine are built and tested. `expand`, `listResources`,
+> and `listSubjects` are not implemented. See [PLAN.md](./PLAN.md) for the breakdown.
 
 ## Why
 
@@ -145,15 +144,49 @@ Every leaf either cites the tuples that produced it or the query that came back 
 and the whole thing is a plain JSON-serializable tree — the text is a view of the
 structure, not a separate code path, so the two cannot disagree.
 
+## Conditions
+
+A condition is a predicate in the model. Only its *name* and a few bound parameters live
+on the tuple, so tuples still serialize cleanly and a store never evaluates anything.
+
+```ts
+defineCondition(
+  'inRegion',
+  (ctx) => ctx.userTier === 'pro' && ctx.resourceRegion === 'eu',
+  { params: { resourceRegion: 'string' } },
+);
+
+await authz.grant({
+  subject: 'user:alice',
+  relation: 'owner',
+  resource: 'document:123',
+  condition: 'inRegion',
+  context: { resourceRegion: 'eu' },   // bound by the writer
+});
+
+await authz.check(
+  { subject: 'user:alice', permission: 'document.read', resource: 'document:123' },
+  { context: { userTier: 'pro' } },   // known only by the caller
+);
+```
+
+The tuple's parameters are **authoritative**. If the request could override
+`resourceRegion`, a caller could rewrite the constraint the grant was written with, and
+the condition would be theatre.
+
+The optional `params` schema governs what a *tuple* may bind, not everything the
+predicate reads. Its real job is making a missing key detectable: a predicate reading an
+absent key just gets `undefined` and quietly returns false, which is
+indistinguishable from a genuine denial. Declaring params turns that silence into a
+reason. Unknown or mistyped bound parameters are rejected at `grant` time, where a typo
+is still cheap to fix.
+
 ## Fails closed
 
-A condition that throws, a missing context key, an unresolvable reference, or an
-exhausted depth/node/deadline budget all resolve to **not allowed**. Never allowed,
-never thrown through to the caller. If `tsbouncer` is confused, it says no.
-
-This is also why a tuple that *would* satisfy a conditional edge currently denies rather
-than allows: conditions are not evaluated yet, and a grant nobody checked is the one
-outcome an authorization library must never produce.
+A condition that throws, a missing or mistyped context key, a condition the model no
+longer declares, an unresolvable reference, or an exhausted depth/node/deadline budget
+all resolve to **not allowed**. Never allowed, never thrown through to the caller. If
+`tsbouncer` is confused, it says no.
 
 ## Install
 

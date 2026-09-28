@@ -139,7 +139,31 @@ of which denied access that plainly existed:
 A member's answer is a pure function of `(subject, member, resource)`, so one frame per
 member is both the simplest and the only correct granularity.
 **Cut line:** M1+M2+M5+M6 is a shippable alpha if M3/M4 overrun. They're in v0.1 as you decided; this is only the escape hatch.
-**Status:** M1, M2, M3, S1–S3 shipped. M4 (conditions) remains.
+**Status:** M1–M4, S1–S3 shipped. M5 (`jsonStore`) and M6 (root package, docs, release) remain.
+The engine is complete: ReBAC/RBAC, usersets, wildcards, tuple-to-userset, and conditions.
+
+### Conditions: what binds and what arrives
+
+A condition has two halves of input. The **tuple** carries what the writer bound —
+`resourceRegion: 'eu'` is part of the grant and is stored with it. The **request**
+carries what the caller knows right now — `userTier: 'pro'` is not in the store at all.
+The predicate sees `{ ...request, ...tuple }`.
+
+**The tuple wins on a conflict.** If the request could override `resourceRegion`, a
+caller could rewrite the constraint the grant was written with and the condition would be
+theatre. There is a test for exactly that.
+
+The optional `params` schema governs what a *tuple* may bind, not everything the
+predicate reads — `userTier` is never bound, so declaring it would be wrong. Its real
+job is making a **missing** key detectable: a JavaScript predicate reading an absent key
+just gets `undefined` and quietly returns false, which is indistinguishable from a
+genuine denial. Declaring params turns that silence into a reason in `explain()`.
+
+Every condition path fails closed, in this order: undeclared condition, missing declared
+param, wrong param type, predicate threw, predicate returned false. A tuple that carries
+a condition is now evaluated rather than skipped, on all three edge kinds — `direct`,
+`userset`, and tuple-to-userset — via one shared partition, so they cannot drift apart on
+what "conditional" means.
 
 ## Correctness risks to design against up front
 

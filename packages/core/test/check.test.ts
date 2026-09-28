@@ -306,14 +306,19 @@ describe('limits', () => {
 });
 
 describe('userset conditions fail closed', () => {
-  it('does not grant through a conditional userset tuple', async () => {
-    // The userset read must respect the condition too. Recursing into a
-    // conditional userset tuple would grant on a condition nobody evaluated,
-    // which is the one way this engine could fail open.
+  it('grants through a userset tuple whose condition holds', async () => {
+    const authz = setup([
+      T('team:eng#member', 'editor', 'document:1', { condition: 'always' }),
+      T('user:alice', 'member', 'team:eng'),
+    ]);
+    expect(await authz.can('user:alice', 'document.read', 'document:1')).toBe(true);
+  });
+
+  it('does not grant through a userset tuple whose condition does not hold', async () => {
     const authz = setup([
       T('team:eng#member', 'editor', 'document:1', {
-        condition: 'inRegion',
-        context: { region: 'eu' },
+        condition: 'strict',
+        context: { region: 'us' },
       }),
       T('user:alice', 'member', 'team:eng'),
     ]);
@@ -322,7 +327,7 @@ describe('userset conditions fail closed', () => {
 
   it('still allows when an unconditional tuple is also present', async () => {
     const authz = setup([
-      T('team:eng#member', 'editor', 'document:1', { condition: 'inRegion' }),
+      T('team:eng#member', 'editor', 'document:1', { condition: 'always' }),
       T('team:ops#member', 'editor', 'document:1'),
       T('user:alice', 'member', 'team:eng'),
       T('user:alice', 'member', 'team:ops'),
@@ -332,7 +337,10 @@ describe('userset conditions fail closed', () => {
 
   it('explains why a conditional userset did not grant', async () => {
     const authz = setup([
-      T('team:eng#member', 'editor', 'document:1', { condition: 'inRegion' }),
+      T('team:eng#member', 'editor', 'document:1', {
+        condition: 'strict',
+        context: { region: 'us' },
+      }),
       T('user:alice', 'member', 'team:eng'),
     ]);
     const result = await authz.explain({
@@ -342,7 +350,7 @@ describe('userset conditions fail closed', () => {
     });
     expect(result.allowed).toBe(false);
     const userset = flattenOps(result.tree).find((n) => n.op === 'userset');
-    expect(userset?.reason).toMatch(/conditional/);
+    expect(userset?.reason).toMatch(/condition/);
   });
 });
 

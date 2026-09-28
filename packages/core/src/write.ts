@@ -1,3 +1,4 @@
+import { validateBoundContext } from './conditions.js';
 import { TupleValidationError } from './errors.js';
 import type { Model, SetNode } from './model.js';
 import { type ParsedRef, parseRef } from './refs.js';
@@ -68,6 +69,18 @@ export function validateTuple(model: Model, tuple: Tuple): void {
       `condition ${JSON.stringify(tuple.condition)} is not declared by the model`,
       { condition: tuple.condition, declared: Object.keys(model.conditions) },
     );
+  }
+
+  // Catching `region: 'eu'` typo'd as `regoin: 'eu'` here is worth far more than
+  // discovering at check time that the condition silently denied.
+  const context = validateBoundContext(model, tuple);
+  if (!context.ok) {
+    throw new TupleValidationError(context.reason, {
+      condition: tuple.condition,
+      subject: subject.type,
+      resource: resource.type,
+      relation: tuple.relation,
+    });
   }
 }
 

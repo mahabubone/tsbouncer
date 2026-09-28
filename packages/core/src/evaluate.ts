@@ -1,3 +1,4 @@
+import { evaluateTupleCondition } from './conditions.js';
 import { EvaluationLimitError } from './errors.js';
 import type { ExplainNode, ExplainOp } from './explain.js';
 import { Budget, type EvaluationLimits } from './limits.js';
@@ -241,26 +242,55 @@ async function direct(
   };
 
   const page = await read(ctx, query);
-  const usable = page.filter((t) => t.condition === undefined);
-  if (usable.length > 0) {
-    return { allowed: true, tree: trace('direct', true, { query, tuples: usable }) };
-  }
+  const split = splitByCondition(ctx, page);
 
-  const blocked = page.filter((t) => t.condition !== undefined);
-  if (blocked.length > 0) {
+  if (split.satisfied.length > 0) {
     return {
-      allowed: false,
-      tree: trace('direct', false, {
+      allowed: true,
+      tree: trace('direct', true, {
         query,
-        children: blocked.map((t) => conditionTrace(t.condition)),
-        reason: 'matching tuple is conditional and conditions are not evaluated yet',
+        tuples: split.satisfied,
+        children: split.failed,
       }),
     };
   }
   return {
     allowed: false,
-    tree: trace('direct', false, { query, reason: 'no matching tuples' }),
+    tree: trace('direct', false, { query, children: split.failed, reason: split.reason }),
   };
+}
+
+/**
+ * Partition a page of tuples into the ones that hold and the ones that do not.
+ *
+ * Every edge kind downstream needs the same three answers: which tuples justified
+ * an allow, which ones explain a denial, and one sentence saying why nothing did.
+ * Doing it in one place is what keeps `direct`, `userset`, and the
+ * tuple-to-userset from drifting apart on what "conditional" means.
+ */
+function splitByCondition(
+  ctx: Ctx,
+  tuples: readonly Tuple[],
+): { satisfied: Tuple[]; failed: ExplainNode[]; reason: string } {
+  const satisfied: Tuple[] = [];
+  const failed: ExplainNode[] = [];
+
+  for (const tuple of tuples) {
+    const outcome = evaluateTupleCondition(ctx.model, tuple, ctx.context);
+    if (outcome.satisfied) {
+      satisfied.push(tuple);
+    } else {
+      failed.push(
+        trace('condition', false, { name: tuple.condition, reason: outcome.reason }),
+      );
+    }
+  }
+
+  let reason = 'no matching tuples';
+  if (tuples.length > 0 && failed.length > 0) {
+    reason = 'every matching tuple is conditional and none of its conditions hold';
+  }
+  return { satisfied, failed, reason };
 }
 
 async function userset(
@@ -275,7 +305,11 @@ async function userset(
   const query: ReadTupleQuery = { relation: member, resource: formatRef(resource) };
   const page = await read(ctx, query);
 
-  const resolved = page
+  // A conditional userset tuple gates the whole expansion, so it is held to the
+  // same condition as the direct edge rather than being skipped outright.
+  const split = splitByCondition(ctx, page);
+
+  const candidates = split.satisfied
     .map((t) => ({ tuple: t, ref: tryRef(t.subject) }))
     .filter(
       (c): c is { tuple: Tuple; ref: ParsedRef } =>
@@ -284,21 +318,15 @@ async function userset(
         c.ref.relation === node.relation,
     );
 
-  // A conditional userset tuple is not satisfiable yet, so it must not be treated
-  // as a candidate at all. Recursing into one would grant on the strength of a
-  // condition nobody evaluated — the one way this engine could fail open.
-  const blocked = resolved.filter((c) => c.tuple.condition !== undefined);
-  const candidates = resolved.filter((c) => c.tuple.condition === undefined);
-
   if (candidates.length === 0) {
     return {
       allowed: false,
       tree: trace('userset', false, {
         query,
-        children: blocked.map((c) => conditionTrace(c.tuple.condition)),
+        children: split.failed,
         reason:
-          blocked.length > 0
-            ? 'the only matching userset tuple is conditional'
+          page.length > 0
+            ? 'no tuple names a matching userset whose condition holds'
             : `no tuple names a ${node.type}#${node.relation} subject`,
       }),
     };
@@ -325,7 +353,7 @@ async function userset(
     allowed: false,
     tree: trace('userset', false, {
       query,
-      children: [...children, ...blocked.map((c) => conditionTrace(c.tuple.condition))],
+      children: [...children, ...split.failed],
     }),
   };
 }
@@ -358,15 +386,17 @@ async function tupleToUserset(
   const query: ReadTupleQuery = { relation: node.through, resource: formatRef(resource) };
   const page = await read(ctx, query);
 
-  const parents = page
+  // A conditional parent tuple gates the inheritance, so it is held to the same
+  // condition as every other edge.
+  const split = splitByCondition(ctx, page);
+
+  const parents = split.satisfied
     .map((t) => ({ tuple: t, ref: tryRef(t.subject, 'subject') }))
     .filter(
       (c): c is { tuple: Tuple; ref: ParsedRef } =>
         // A traversal subject is a plain object. A userset here would make the
         // tuple a subject-rewrite, which is the `userset` node's job.
-        c.ref !== undefined &&
-        c.ref.relation === undefined &&
-        c.tuple.condition === undefined,
+        c.ref !== undefined && c.ref.relation === undefined,
     );
 
   if (parents.length === 0) {
@@ -376,9 +406,10 @@ async function tupleToUserset(
         through: node.through,
         target: node.target,
         query,
+        children: split.failed,
         reason:
           page.length > 0
-            ? 'no traversable parent: the subject is a userset or is conditional'
+            ? 'no traversable parent: the subject is a userset or its condition does not hold'
             : `no ${node.through} tuple for this object`,
       }),
     };
@@ -398,7 +429,7 @@ async function tupleToUserset(
           through: node.through,
           target: node.target,
           query,
-          children,
+          children: [...children, ...split.failed],
           tuples: [parent.tuple],
         }),
       };
@@ -428,12 +459,6 @@ function tryRef(input: string, position: RefPosition = 'any'): ParsedRef | undef
   } catch {
     return undefined;
   }
-}
-
-function conditionTrace(condition: string | undefined): ExplainNode {
-  return trace('condition', false, {
-    reason: `${condition ?? 'condition'} is not evaluated yet; failing closed`,
-  });
 }
 
 function trace(

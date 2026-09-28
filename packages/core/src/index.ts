@@ -7,6 +7,12 @@ export type {
   GrantInput,
 } from './client.js';
 export { createAuthz } from './client.js';
+export type { ConditionDenied, ConditionOutcome } from './conditions.js';
+export {
+  evaluateTupleCondition,
+  mergeContext,
+  validateBoundContext,
+} from './conditions.js';
 export type {
   AuthorizationErrorCode,
   AuthorizationErrorOptions,
@@ -27,7 +33,6 @@ export { evaluate } from './evaluate.js';
 export type { ExplainNode, ExplainOp, ExplainResult } from './explain.js';
 export { formatExplain } from './explain.js';
 export type { EvaluationLimits, LimitKind } from './limits.js';
-
 export { Budget, DEFAULT_LIMITS, resolveLimits } from './limits.js';
 export type {
   Child,
@@ -93,5 +98,4 @@ export type {
   WriteMode,
 } from './store.js';
 export { assertStoreShape, matchesQuery, NO_CAPABILITIES, tupleKey } from './store.js';
-
 export { acceptsSubject, describeTuple, validateTuple, validateTuples } from './write.js';

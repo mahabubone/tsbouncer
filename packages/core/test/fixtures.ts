@@ -1,6 +1,7 @@
 import type { Authz, Tuple } from '../src/index.js';
 import {
   createAuthz,
+  defineCondition,
   defineModel,
   defineType,
   permission,
@@ -67,6 +68,22 @@ export const model = defineModel({
         // levels down the archive chain with no extra permission here.
         inherited: permission.or(ttu('parent', 'read')),
       },
+    }),
+  },
+  conditions: {
+    // The canonical split: `resourceRegion` is bound by the tuple at write time,
+    // `userTier` arrives with the request. Only the first is a declared param.
+    inRegion: defineCondition(
+      'inRegion',
+      (ctx) => ctx.userTier === 'pro' && ctx.resourceRegion === 'eu',
+      { params: { resourceRegion: 'string' } },
+    ),
+    always: defineCondition('always', () => true),
+    explodes: defineCondition('explodes', () => {
+      throw new Error('boom');
+    }),
+    strict: defineCondition('strict', (ctx) => ctx.region === 'eu', {
+      params: { region: 'string' as const },
     }),
   },
 });

@@ -24,6 +24,8 @@ These are decided. Do not relitigate them in PRs; change `PLAN.md` deliberately 
    library would ship subtly-wrong authorization.
 5. **Model vs data stay separate.** Predicates (`defineCondition`) are code in the model.
    Tuples carry only the condition *name* + context params, so they serialize cleanly.
+   The tuple's params are authoritative; the request only fills gaps. A caller that could
+   override a bound param would be rewriting the constraint the grant was written with.
 6. **Stores are dumb.** No condition evaluation, no permission resolution in a store.
 7. **Fail closed.** Any condition error, missing context key, or thrown predicate means
    *not allowed* — never allowed, never throw through to the caller.
@@ -103,11 +105,12 @@ too many paths or the test is contrived — say which in the PR.
 
 ## Engine state
 
-Conditions are **not implemented** and deliberately return *not allowed*, with a
-`reason` in `explain()`. A tuple carrying a condition therefore denies on both the
-`direct` and the `userset` path, and a conditional parent tuple is skipped by the
-tuple-to-userset. Do not make any of them permissive to "fix" a failing test — a
-grant nobody checked is the one outcome this library must never produce.
+The engine is complete: direct, userset, wildcard, union, intersection, exclusion,
+tuple-to-userset, and conditions. Every condition path fails closed — an undeclared
+condition, a missing or mistyped declared param, a predicate that throws, and one that
+returns false all resolve to not allowed with a reason in `explain()`. Do not make any
+of them permissive to "fix" a failing test: a grant nobody checked is the one outcome
+this library must never produce.
 
 `expand`, `listResources`, and `listSubjects` are declared in the API but not
 implemented yet.
@@ -148,8 +151,9 @@ the evaluator.
   node separately collides in three ways that all deny real access: a `computed`
   reference under the parent's name, a relation's own `direct`/`userset` children
   under the relation, and an exclusion's `base` under the exclusion.
-- **A userset edge must respect conditions.** Skip a candidate whose tuple carries
-  one, or it grants on a condition nobody evaluated. The only fail-open path.
+- **A condition gates every edge kind.** `direct`, `userset`, and tuple-to-userset all
+  route through one `splitByCondition` partition. They used to be three ad-hoc filters,
+  and `userset` was briefly fail-open because only two of them checked.
 
 ## Working agreement
 

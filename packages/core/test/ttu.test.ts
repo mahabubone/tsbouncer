@@ -215,9 +215,20 @@ describe('budget', () => {
 });
 
 describe('conditions fail closed', () => {
-  it('does not inherit through a conditional parent tuple', async () => {
+  it('inherits through a parent whose condition holds', async () => {
     const authz = setup([
-      T('folder:9', 'parent', 'document:1', { condition: 'inRegion' }),
+      T('folder:9', 'parent', 'document:1', { condition: 'always' }),
+      T('user:alice', 'viewer', 'folder:9'),
+    ]);
+    expect(await authz.can('user:alice', 'document.inherited', 'document:1')).toBe(true);
+  });
+
+  it('does not inherit through a parent whose condition does not hold', async () => {
+    const authz = setup([
+      T('folder:9', 'parent', 'document:1', {
+        condition: 'strict',
+        context: { region: 'us' },
+      }),
       T('user:alice', 'viewer', 'folder:9'),
     ]);
     expect(await authz.can('user:alice', 'document.inherited', 'document:1')).toBe(false);
@@ -225,7 +236,10 @@ describe('conditions fail closed', () => {
 
   it('inherits when an unconditional parent tuple is also present', async () => {
     const authz = setup([
-      T('folder:9', 'parent', 'document:1', { condition: 'inRegion' }),
+      T('folder:9', 'parent', 'document:1', {
+        condition: 'strict',
+        context: { region: 'us' },
+      }),
       T('folder:8', 'parent', 'document:1'),
       T('user:alice', 'viewer', 'folder:8'),
     ]);
@@ -286,9 +300,12 @@ describe('explain', () => {
     expect(ttu?.reason).toMatch(/no parent tuple/);
   });
 
-  it('explains a conditional parent', async () => {
+  it('explains a parent whose condition does not hold', async () => {
     const authz = setup([
-      T('folder:9', 'parent', 'document:1', { condition: 'inRegion' }),
+      T('folder:9', 'parent', 'document:1', {
+        condition: 'strict',
+        context: { region: 'us' },
+      }),
     ]);
     const result = await authz.explain({
       subject: 'user:alice',
@@ -296,6 +313,7 @@ describe('explain', () => {
       resource: 'document:1',
     });
     const ttu = flatten(result.tree).find((n) => n.op === 'ttu');
-    expect(ttu?.reason).toMatch(/conditional/);
+    expect(ttu?.reason).toMatch(/condition does not hold/);
+    expect(flatten(result.tree).some((n) => n.op === 'condition')).toBe(true);
   });
 });

@@ -245,13 +245,20 @@ describe('formatExplain branches', () => {
     // A conditioned tuple is reported as a `condition` child rather than as a
     // citing tuple, so the reason a conditional grant failed is visible.
     const result = await explainFor(
-      [{ ...T('user:alice', 'owner', 'document:1'), condition: 'inRegion' }],
+      [
+        {
+          ...T('user:alice', 'owner', 'document:1'),
+          condition: 'strict',
+          context: { region: 'us' },
+        },
+      ],
       { subject: 'user:alice', permission: 'document.owner', resource: 'document:1' },
     );
     const text = formatExplain(result);
+    expect(result.allowed).toBe(false);
     expect(text).toContain('condition');
-    expect(text).toContain('inRegion');
-    expect(text).toContain('failing closed');
+    expect(text).toContain('strict');
+    expect(text).toContain('returned false');
   });
 
   it('renders an intersection and an exclusion', async () => {
