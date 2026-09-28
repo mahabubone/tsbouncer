@@ -1,6 +1,7 @@
 // biome-ignore-all lint/performance/noDynamicNamespaceImportAccess: enumerating the export surface by name is the point of this test
 import { describe, expect, it } from 'vitest';
 import * as api from '../src/index.js';
+import { testStore } from './store.js';
 
 /**
  * The barrel is part of the measured surface, so it gets a real test rather
@@ -54,6 +55,22 @@ describe('public API surface', () => {
     }
   });
 
+  it('exports the check engine and client', () => {
+    for (const name of [
+      'createAuthz',
+      'evaluate',
+      'formatExplain',
+      'validateTuple',
+      'validateTuples',
+      'acceptsSubject',
+      'resolveLimits',
+      'DEFAULT_LIMITS',
+      'Budget',
+    ] as const) {
+      expect(api[name], name).toBeDefined();
+    }
+  });
+
   it('exports every error class and the type guard', () => {
     for (const name of [
       'AuthorizationError',
@@ -68,6 +85,24 @@ describe('public API surface', () => {
     ] as const) {
       expect(api[name], name).toBeDefined();
     }
+  });
+
+  it('answers a decision through the public entry point', async () => {
+    const authz = api.createAuthz({
+      model: api.defineModel({
+        types: {
+          user: api.defineType({}),
+          document: api.defineType({
+            relations: { owner: api.relation(['user']) },
+            permissions: { read: api.permission.or('owner') },
+          }),
+        },
+      }),
+      store: testStore(),
+    });
+    expect(typeof authz.can).toBe('function');
+    expect(typeof authz.explain).toBe('function');
+    expect(api.typeNames(authz.model)).toEqual(['user', 'document']);
   });
 
   it('round-trips through the public entry point', () => {

@@ -337,6 +337,17 @@ function validateLocal(typeName: string, definition: TypeDefinition): void {
           { type: typeName, through: child.through },
         );
       }
+      // A tuple is only ever written against a relation, so a permission that
+      // contains a direct or userset edge names an edge that can never exist.
+      if (
+        fromKind === 'permission' &&
+        (child.kind === 'direct' || child.kind === 'userset')
+      ) {
+        throw new ModelDefinitionError(
+          `type ${JSON.stringify(typeName)} permission ${JSON.stringify(fromName)} contains a ${child.kind} edge, but tuples are only written against relations — reference a relation instead`,
+          { type: typeName, name: fromName, edge: child.kind },
+        );
+      }
     });
   };
 

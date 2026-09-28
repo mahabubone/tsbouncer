@@ -45,11 +45,11 @@ tsbouncer/
 ## Public API
 
 ```ts
-// definition (runtime-validated at createKeyman)
+// definition (runtime-validated at createAuthz)
 defineModel, defineType, relation, permission, defineCondition
 
 // client
-createKeyman({ model, store })
+createAuthz({ model, store })
 
 // data        grant · revoke · write · delete · replace · export · import
 // decisions   can(s,p,r) -> boolean
@@ -78,7 +78,7 @@ interface KeymanStore {
 |---|---|---|
 | M1 | `refs` · `defineModel` · runtime validation · `memoryStore` · **`testkit`** | low |
 | M2 | check engine — direct, userset, union, intersection, exclusion, wildcard · `explain` | low |
-| M3 | TTU traversal · limits · memo · cycle detection | **high** |
+| M3 | TTU traversal (lands the `ttu` node, which currently denies) | **high** |
 | M4 | conditions / ABAC, fail-closed | med |
 | M5 | `jsonStore` (atomic temp+rename) — makes testkit pass again | med |
 | M6 | root `tsbouncer` pkg · docs · examples · release | low |
@@ -100,8 +100,30 @@ must use its ORM's native per-dialect path or a transactionally correct fallback
 never a dialect-specific incantation that silently no-ops elsewhere.
 
 **M1 before M2 deliberately:** prove the store contract with `memoryStore` + a conformance suite *before* building an engine on it. With no CLI, testkit is the primary quality gate, so it cannot come last.
+
+**M2 pulled the budget work forward.** Depth, node, and deadline limits, the per-request
+memo, and the cycle guard all landed with the engine rather than in M3. A rewrite engine
+without them is a denial-of-service vector, and TTU is only *more* dangerous. M3 is now
+just tuple-to-userset.
+
+### Memo granularity — the rule that took three attempts to get right
+
+The memo is keyed `subject#member@resource` and **one frame is opened per member, at its
+top-level node**. `union`, `intersection`, and `exclusion` are walked without opening
+frames. Keying every node individually is tidier and wrong, in three distinct ways, each
+of which denied access that plainly existed:
+
+- a `computed` reference keyed under the *parent's* member name collided with the
+  parent's own key, so `read = or(owner, …)` self-reported a cycle;
+- a relation's own `direct`/`userset` children collided with the relation, so
+  `editor = user | team#member` denied everything;
+- an exclusion's `base` inherited the exclusion's key, so `(a and b) except banned`
+  denied everyone who satisfied the base.
+
+A member's answer is a pure function of `(subject, member, resource)`, so one frame per
+member is both the simplest and the only correct granularity.
 **Cut line:** M1+M2+M5+M6 is a shippable alpha if M3/M4 overrun. They're in v0.1 as you decided; this is only the escape hatch.
-**Status:** S1–S3 shipped. M2 (the check engine) is next and is not started.
+**Status:** M1, M2, S1–S3 shipped. M3 (tuple-to-userset) and M4 (conditions) remain.
 
 ## Correctness risks to design against up front
 

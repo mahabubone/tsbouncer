@@ -1,4 +1,13 @@
 export type {
+  Authz,
+  CheckOptions,
+  CheckRequest,
+  CreateAuthzOptions,
+  Decision,
+  GrantInput,
+} from './client.js';
+export { createAuthz } from './client.js';
+export type {
   AuthorizationErrorCode,
   AuthorizationErrorOptions,
 } from './errors.js';
@@ -13,6 +22,13 @@ export {
   StoreError,
   TupleValidationError,
 } from './errors.js';
+export type { EvaluationOutcome, EvaluationRequest } from './evaluate.js';
+export { evaluate } from './evaluate.js';
+export type { ExplainNode, ExplainOp, ExplainResult } from './explain.js';
+export { formatExplain } from './explain.js';
+export type { EvaluationLimits, LimitKind } from './limits.js';
+
+export { Budget, DEFAULT_LIMITS, resolveLimits } from './limits.js';
 export type {
   Child,
   ComputedNode,
@@ -77,3 +93,5 @@ export type {
   WriteMode,
 } from './store.js';
 export { assertStoreShape, matchesQuery, NO_CAPABILITIES, tupleKey } from './store.js';
+
+export { acceptsSubject, describeTuple, validateTuple, validateTuples } from './write.js';

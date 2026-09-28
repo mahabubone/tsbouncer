@@ -101,6 +101,13 @@ coverage number, is what catches a dropped export.
 Do not add code without a test. If a branch resists a test, either the code has
 too many paths or the test is contrived — say which in the PR.
 
+## Engine state
+
+Tuple-to-userset and conditions are **not implemented** and deliberately return *not
+allowed*, with a `reason` in `explain()`. Do not make either of them permissive to
+"fix" a failing test. A model that uses them currently denies, which is the correct
+behaviour for a check that has not happened yet.
+
 ## Conventions
 
 - TypeScript `strict`, no `any` in public surface.
@@ -127,6 +134,12 @@ the evaluator.
   subtlest bug in the codebase.
 - **Cycle detection.** TTU and nested rewrites can loop. `seen` set + depth/node
   budget + deadline, all enforced together.
+- **Memo granularity.** One frame per *member*, at its top-level node. Keying each
+  node separately collides in three ways that all deny real access: a `computed`
+  reference under the parent's name, a relation's own `direct`/`userset` children
+  under the relation, and an exclusion's `base` under the exclusion.
+- **A userset edge must respect conditions.** Skip a candidate whose tuple carries
+  one, or it grants on a condition nobody evaluated. The only fail-open path.
 
 ## Working agreement
 

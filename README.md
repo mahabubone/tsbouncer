@@ -5,9 +5,10 @@
 Define authorization data, relationships, and policies. `tsbouncer` evaluates access
 — over pluggable storage, inside your application.
 
-> **Status: pre-alpha.** Nothing is published yet. The design is settled and locked in
-> [PLAN.md](./PLAN.md); the implementation is being built milestone by milestone. The
-> snippets below describe the intended API and are not yet runnable.
+> **Status: pre-alpha.** Nothing is published yet. The model, the store contract, five
+> stores, and the check engine are built and tested; tuple-to-userset and conditions are
+> not yet implemented, and both currently **deny** rather than allow. See
+> [PLAN.md](./PLAN.md) for the milestone breakdown.
 
 ## Why
 
@@ -96,10 +97,13 @@ One primitive is mandatory: a filtered tuple read. Everything else — reverse w
 tuples, they don't decide anything.
 
 ```ts
-import { createKeyman } from '@tsbouncer/core';
+import { createAuthz } from '@tsbouncer/core';
 import { memoryStore } from '@tsbouncer/memory';
 
-const authz = createKeyman({ model, store: memoryStore() });
+const authz = createAuthz({ model, store: memoryStore() });
+
+await authz.grant({ subject: 'user:alice', relation: 'owner', resource: 'document:123' });
+await authz.can('user:alice', 'document.read', 'document:123'); // true
 ```
 
 Because the contract is that small, it also runs on JSON on disk, or on a SQL database
@@ -122,19 +126,35 @@ Every decision can tell you why, citing the tuples that produced it.
 
 ```ts
 const result = await authz.explain({
-  subject: "user:alice",
-  permission: "document.read",
-  resource: "document:123",
+  subject: 'user:alice',
+  permission: 'document.read',
+  resource: 'document:123',
 });
 
-format(result); // "ALLOWED  user:alice -> document:123#read ..."
+formatExplain(result);
 ```
+
+```
+ALLOWED  user:alice -> document:123#read
+  + union
+    + owner
+      user:alice#owner@document:123
+```
+
+Every leaf either cites the tuples that produced it or the query that came back empty,
+and the whole thing is a plain JSON-serializable tree — the text is a view of the
+structure, not a separate code path, so the two cannot disagree.
 
 ## Fails closed
 
-A condition that throws, a missing context key, an unresolvable reference, or an
-exhausted evaluation budget all resolve to **not allowed**. Never allowed, never thrown
-through to the caller. If `tsbouncer` is confused, it says no.
+A condition that throws, a missing context key, an unresolvable reference, a
+tuple-to-userset this version cannot evaluate, or an exhausted depth/node/deadline
+budget all resolve to **not allowed**. Never allowed, never thrown through to the
+caller. If `tsbouncer` is confused, it says no.
+
+This is also why a tuple that *would* satisfy a conditional edge currently denies rather
+than allows: conditions are not evaluated yet, and a grant nobody checked is the one
+outcome an authorization library must never produce.
 
 ## Install
 
