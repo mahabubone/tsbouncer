@@ -1,0 +1,38 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "ui": "stream",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "src/**",
+        "tsup.config.ts",
+        "package.json",
+        "tsconfig.json",
+        "tsconfig.base.json"
+      ],
+      "outputs": ["dist/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "inputs": ["src/**", "test/**", "tsconfig.json", "tsconfig.base.json"]
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "inputs": ["src/**", "test/**", "vitest.config.ts", "vitest.shared.ts"],
+      "outputs": ["coverage/**"]
+    },
+    "test:coverage": {
+      "dependsOn": ["^build"],
+      "inputs": ["src/**", "test/**", "vitest.config.ts", "vitest.shared.ts"],
+      "outputs": ["coverage/**"]
+    },
+    "pack:check": {
+      "dependsOn": ["build"],
+      "outputs": ["pack-check/**"]
+    },
+    "lint": {
+      "inputs": ["src/**", "test/**"]
+    }
+  }
+}

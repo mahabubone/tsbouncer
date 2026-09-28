@@ -1,0 +1,48 @@
+{
+  "name": "@tsbouncer/core",
+  "version": "0.0.0",
+  "description": "Authorization graph kernel. Zero dependencies, zero node:* imports, ESM only.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20.11"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "authorization",
+    "authz",
+    "rebac",
+    "rbac",
+    "abac",
+    "zanzibar",
+    "permissions",
+    "esm"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "pack:check": "publint --strict && attw --pack . --profile esm-only",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "0.18.5",
+    "publint": "0.3.24",
+    "tsup": "8.5.1",
+    "typescript": "5.9.3",
+    "vitest": "5.0.2",
+    "@vitest/coverage-v8": "5.0.2"
+  }
+}

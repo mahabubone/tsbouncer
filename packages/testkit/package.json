@@ -1,0 +1,46 @@
+{
+  "name": "@tsbouncer/testkit",
+  "version": "0.0.0",
+  "description": "Conformance suite every KeymanStore must pass. There is no CLI; this is the gate.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20.11"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "authorization",
+    "authz",
+    "store",
+    "conformance",
+    "testkit",
+    "esm"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@tsbouncer/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "vitest": ">=3"
+  },
+  "devDependencies": {
+    "tsup": "8.5.1",
+    "typescript": "5.9.3",
+    "vitest": "5.0.2"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "name": "tsbouncer-workspace",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The bouncer for TypeScript/JS ESM-only apps.",
+  "license": "MIT",
+  "packageManager": "pnpm@11.5.0",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:watch": "vitest --root packages/core",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "pack:check": "turbo run pack:check",
+    "check": "pnpm lint && pnpm typecheck && pnpm build && pnpm pack:check && pnpm test:coverage",
+    "test:coverage": "turbo run test:coverage",
+    "coverage": "turbo run test:coverage"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.14",
+    "turbo": "2.11.5",
+    "typescript": "5.9.3",
+    "@vitest/coverage-v8": "5.0.2",
+    "vitest": "5.0.2"
+  }
+}
