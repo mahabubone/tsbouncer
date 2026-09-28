@@ -2,7 +2,13 @@ import { EvaluationLimitError } from './errors.js';
 import type { ExplainNode, ExplainOp } from './explain.js';
 import { Budget, type EvaluationLimits } from './limits.js';
 import type { ConditionContext, Model, SetNode } from './model.js';
-import { formatRef, type ParsedRef, parseRef, WILDCARD } from './refs.js';
+import {
+  formatRef,
+  type ParsedRef,
+  parseRef,
+  type RefPosition,
+  WILDCARD,
+} from './refs.js';
 import type { KeymanStore, ReadTupleQuery, Tuple } from './store.js';
 
 export interface EvaluationRequest {
@@ -168,16 +174,7 @@ async function step(
     }
 
     case 'ttu':
-      // Tuple-to-userset lands in a later milestone. Failing closed means a model
-      // that uses one simply denies, rather than silently allowing.
-      return {
-        allowed: false,
-        tree: trace('ttu', false, {
-          through: node.through,
-          target: node.target,
-          reason: 'tuple-to-userset is not implemented yet',
-        }),
-      };
+      return tupleToUserset(ctx, node, resource, depth);
 
     case 'union': {
       const children: ExplainNode[] = [];
@@ -333,6 +330,91 @@ async function userset(
   };
 }
 
+/**
+ * Tuple-to-userset: follow `through` to a related object, then take `target` on
+ * it. The Zanzibar form is `parent.folder#viewer`.
+ *
+ * This is a close cousin of a userset edge, and confusing the two is the bug
+ * class here. Both issue the same read — tuples for `(relation, this object)` —
+ * and both recurse into each tuple's **subject**. They differ in what that
+ * subject means:
+ *
+ *   userset  the subject is a userset (`team:eng#member`): strip the `#relation`
+ *            and re-enter that object under the relation the userset named.
+ *   ttu      the subject is a plain object (`folder:9`): re-enter it under
+ *            `target`, resolved against whatever type that object turns out to
+ *            be, so a multi-type `through` needs no help from the model.
+ *
+ * The subject is what is traversed in both cases. Reading the *resource* here
+ * would walk back up the edge and re-test the object we started from, which
+ * silently denies every real grant.
+ */
+async function tupleToUserset(
+  ctx: Ctx,
+  node: Extract<SetNode, { kind: 'ttu' }>,
+  resource: ParsedRef,
+  depth: number,
+): Promise<Outcome> {
+  const query: ReadTupleQuery = { relation: node.through, resource: formatRef(resource) };
+  const page = await read(ctx, query);
+
+  const parents = page
+    .map((t) => ({ tuple: t, ref: tryRef(t.subject, 'subject') }))
+    .filter(
+      (c): c is { tuple: Tuple; ref: ParsedRef } =>
+        // A traversal subject is a plain object. A userset here would make the
+        // tuple a subject-rewrite, which is the `userset` node's job.
+        c.ref !== undefined &&
+        c.ref.relation === undefined &&
+        c.tuple.condition === undefined,
+    );
+
+  if (parents.length === 0) {
+    return {
+      allowed: false,
+      tree: trace('ttu', false, {
+        through: node.through,
+        target: node.target,
+        query,
+        reason:
+          page.length > 0
+            ? 'no traversable parent: the subject is a userset or is conditional'
+            : `no ${node.through} tuple for this object`,
+      }),
+    };
+  }
+
+  const children: ExplainNode[] = [];
+  for (const parent of parents) {
+    // The target is resolved against each parent's *own* type, so a multi-type
+    // `through` relation works without the model having to say which it meant.
+    const targetNode = resolveMember(ctx.model, parent.ref.type, node.target);
+    const result = await visit(ctx, targetNode, parent.ref, node.target, depth + 1);
+    children.push(result.tree);
+    if (result.allowed) {
+      return {
+        allowed: true,
+        tree: trace('ttu', true, {
+          through: node.through,
+          target: node.target,
+          query,
+          children,
+          tuples: [parent.tuple],
+        }),
+      };
+    }
+  }
+  return {
+    allowed: false,
+    tree: trace('ttu', false, {
+      through: node.through,
+      target: node.target,
+      query,
+      children,
+    }),
+  };
+}
+
 async function read(ctx: Ctx, query: ReadTupleQuery): Promise<readonly Tuple[]> {
   ctx.budget.node();
   const page = await ctx.store.read(query);
@@ -340,9 +422,9 @@ async function read(ctx: Ctx, query: ReadTupleQuery): Promise<readonly Tuple[]> 
   return page.items;
 }
 
-function tryRef(input: string): ParsedRef | undefined {
+function tryRef(input: string, position: RefPosition = 'any'): ParsedRef | undefined {
   try {
-    return parseRef(input);
+    return parseRef(input, position);
   } catch {
     return undefined;
   }

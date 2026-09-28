@@ -103,10 +103,14 @@ too many paths or the test is contrived — say which in the PR.
 
 ## Engine state
 
-Tuple-to-userset and conditions are **not implemented** and deliberately return *not
-allowed*, with a `reason` in `explain()`. Do not make either of them permissive to
-"fix" a failing test. A model that uses them currently denies, which is the correct
-behaviour for a check that has not happened yet.
+Conditions are **not implemented** and deliberately return *not allowed*, with a
+`reason` in `explain()`. A tuple carrying a condition therefore denies on both the
+`direct` and the `userset` path, and a conditional parent tuple is skipped by the
+tuple-to-userset. Do not make any of them permissive to "fix" a failing test — a
+grant nobody checked is the one outcome this library must never produce.
+
+`expand`, `listResources`, and `listSubjects` are declared in the API but not
+implemented yet.
 
 ## Conventions
 
@@ -132,8 +136,14 @@ the evaluator.
 - **Memo scope.** The per-request memo must be keyed by store identity, or
   `withStore(trx)` returns results computed against the outer store. This is the
   subtlest bug in the codebase.
-- **Cycle detection.** TTU and nested rewrites can loop. `seen` set + depth/node
-  budget + deadline, all enforced together.
+- **Cycle detection.** A `through` relation can form a loop the model validator
+  cannot see — it only follows same-type `computed` edges, and TTU crosses types.
+  The runtime `active` set catches it; a self-referential test model is in
+  `test/fixtures.ts` for exactly this.
+- **Userset and TTU both recurse on the tuple's `subject`.** Not opposite sides.
+  A userset subject is stripped of its `#relation`; a TTU subject is entered under
+  `target` resolved against its own type. Recursing on the `resource` in a TTU
+  walks back up the edge and denies everything.
 - **Memo granularity.** One frame per *member*, at its top-level node. Keying each
   node separately collides in three ways that all deny real access: a `computed`
   reference under the parent's name, a relation's own `direct`/`userset` children

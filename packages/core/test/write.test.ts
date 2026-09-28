@@ -238,7 +238,13 @@ describe('client construction', () => {
 describe('introspection', () => {
   it('lists types, relations, and permissions', () => {
     const authz = setup();
-    expect(authz.types().sort()).toEqual(['document', 'folder', 'team', 'user']);
+    expect(authz.types().sort()).toEqual([
+      'archive',
+      'document',
+      'folder',
+      'team',
+      'user',
+    ]);
     expect(authz.relations('document')).toContain('owner');
     expect(authz.permissions('document')).toEqual([
       'read',

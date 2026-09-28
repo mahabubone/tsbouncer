@@ -22,10 +22,24 @@ export const model = defineModel({
   types: {
     user: defineType({}),
     team: defineType({ relations: { member: relation(['user']) } }),
+    // The TTU chain. `folder.parent -> archive` and `archive.parent -> folder`
+    // form a loop, which the model validator cannot see (it only follows
+    // same-type `computed` edges) and the runtime cycle guard has to catch.
+    archive: defineType({
+      relations: { viewer: relation(['user']), parent: relation('folder') },
+      permissions: { read: permission.or('viewer', ttu('parent', 'read')) },
+    }),
     folder: defineType({
       // A userset edge: "the members of a team are viewers".
-      relations: { viewer: relation('user').or(relation('team', { through: 'member' })) },
-      permissions: { read: permission.or('viewer') },
+      relations: {
+        viewer: relation('user').or(relation('team', { through: 'member' })),
+        parent: relation('archive'),
+        // A multi-type parent, so a tuple-to-userset can land on either.
+        inherits: relation(['folder', 'archive']),
+      },
+      permissions: {
+        read: permission.or('viewer', ttu('parent', 'read'), ttu('inherits', 'read')),
+      },
     }),
     document: defineType({
       relations: {
@@ -48,6 +62,9 @@ export const model = defineModel({
         read: permission.or('owner', 'editor', 'viewer'),
         write: permission.allOf('owner', 'editor').except('banned'),
         public: permission.or('anyone'),
+        // One level of inheritance from a parent folder. Because
+        // `folder.read` carries its own tuple-to-userset, this also reaches two
+        // levels down the archive chain with no extra permission here.
         inherited: permission.or(ttu('parent', 'read')),
       },
     }),

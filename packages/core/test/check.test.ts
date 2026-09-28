@@ -183,12 +183,12 @@ describe('fail closed', () => {
     expect(await authz.can('user:alice', 'document.read', 'document:1')).toBe(false);
   });
 
-  it('denies through tuple-to-userset until that is implemented', async () => {
+  it('inherits through a parent folder', async () => {
     const authz = setup([
       T('folder:9', 'parent', 'document:1'),
       T('user:alice', 'viewer', 'folder:9'),
     ]);
-    expect(await authz.can('user:alice', 'document.inherited', 'document:1')).toBe(false);
+    expect(await authz.can('user:alice', 'document.inherited', 'document:1')).toBe(true);
   });
 
   it('does not let a condition failure fall through to another branch', async () => {

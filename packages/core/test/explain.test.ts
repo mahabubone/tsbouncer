@@ -121,12 +121,12 @@ describe('explain shape', () => {
     expect(result.tree.children[0]?.op).toBe('condition');
   });
 
-  it('explains an unimplemented tuple-to-userset', async () => {
+  it('explains a tuple-to-userset by name', async () => {
     const result = await explainFor(
       [T('folder:9', 'parent', 'document:1'), T('user:alice', 'viewer', 'folder:9')],
       { subject: 'user:alice', permission: 'document.inherited', resource: 'document:1' },
     );
-    expect(result.allowed).toBe(false);
+    expect(result.allowed).toBe(true);
     const ttu = flatten(result.tree).find((n) => n.op === 'ttu');
     expect(ttu?.through).toBe('parent');
     expect(ttu?.target).toBe('read');

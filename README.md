@@ -6,9 +6,9 @@ Define authorization data, relationships, and policies. `tsbouncer` evaluates ac
 — over pluggable storage, inside your application.
 
 > **Status: pre-alpha.** Nothing is published yet. The model, the store contract, five
-> stores, and the check engine are built and tested; tuple-to-userset and conditions are
-> not yet implemented, and both currently **deny** rather than allow. See
-> [PLAN.md](./PLAN.md) for the milestone breakdown.
+> stores, and the check engine are built and tested. Conditions are not yet implemented
+> and currently **deny** rather than allow. See [PLAN.md](./PLAN.md) for the milestone
+> breakdown.
 
 ## Why
 
@@ -147,10 +147,9 @@ structure, not a separate code path, so the two cannot disagree.
 
 ## Fails closed
 
-A condition that throws, a missing context key, an unresolvable reference, a
-tuple-to-userset this version cannot evaluate, or an exhausted depth/node/deadline
-budget all resolve to **not allowed**. Never allowed, never thrown through to the
-caller. If `tsbouncer` is confused, it says no.
+A condition that throws, a missing context key, an unresolvable reference, or an
+exhausted depth/node/deadline budget all resolve to **not allowed**. Never allowed,
+never thrown through to the caller. If `tsbouncer` is confused, it says no.
 
 This is also why a tuple that *would* satisfy a conditional edge currently denies rather
 than allows: conditions are not evaluated yet, and a grant nobody checked is the one

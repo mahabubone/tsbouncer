@@ -78,7 +78,7 @@ interface KeymanStore {
 |---|---|---|
 | M1 | `refs` · `defineModel` · runtime validation · `memoryStore` · **`testkit`** | low |
 | M2 | check engine — direct, userset, union, intersection, exclusion, wildcard · `explain` | low |
-| M3 | TTU traversal (lands the `ttu` node, which currently denies) | **high** |
+| M3 | TTU traversal (lands the `ttu` node) | **high** |
 | M4 | conditions / ABAC, fail-closed | med |
 | M5 | `jsonStore` (atomic temp+rename) — makes testkit pass again | med |
 | M6 | root `tsbouncer` pkg · docs · examples · release | low |
@@ -106,6 +106,22 @@ memo, and the cycle guard all landed with the engine rather than in M3. A rewrit
 without them is a denial-of-service vector, and TTU is only *more* dangerous. M3 is now
 just tuple-to-userset.
 
+### Userset and tuple-to-userset are cousins, not mirrors
+
+Both issue the same read — tuples for `(relation, this object)` — and both recurse
+into each tuple's **subject**. What differs is what that subject means:
+
+| | subject | recurse into |
+| --- | --- | --- |
+| `userset` | a userset, `team:eng#member` | `team:eng`, under the relation the userset named |
+| `ttu` | a plain object, `folder:9` | `folder:9`, under `target`, resolved against the subject's own type |
+
+The trap is assuming `ttu` mirrors it and recursing on the *resource* instead. That
+walks back up the edge, re-tests the object the walk started from, and denies every
+real grant — while looking like a traversal that simply never matches. Resolving
+`target` against each parent's own type is what makes a multi-type `through` relation
+work with nothing extra from the model.
+
 ### Memo granularity — the rule that took three attempts to get right
 
 The memo is keyed `subject#member@resource` and **one frame is opened per member, at its
@@ -123,7 +139,7 @@ of which denied access that plainly existed:
 A member's answer is a pure function of `(subject, member, resource)`, so one frame per
 member is both the simplest and the only correct granularity.
 **Cut line:** M1+M2+M5+M6 is a shippable alpha if M3/M4 overrun. They're in v0.1 as you decided; this is only the escape hatch.
-**Status:** M1, M2, S1–S3 shipped. M3 (tuple-to-userset) and M4 (conditions) remain.
+**Status:** M1, M2, M3, S1–S3 shipped. M4 (conditions) remains.
 
 ## Correctness risks to design against up front
 
