@@ -39,9 +39,10 @@ packages/stores/json     @tsbouncer/json
 packages/stores/kysely   @tsbouncer/kysely
 packages/stores/drizzle  @tsbouncer/drizzle
 packages/stores/prisma   @tsbouncer/prisma
+packages/stores/json     @tsbouncer/json
 packages/testkit         @tsbouncer/testkit   conformance suite
 packages/tsbouncer       tsbouncer            batteries-included re-export
-examples/                runnable, verified in CI
+examples/                runnable, verified in CI (`pnpm examples`)
 ```
 
 `testkit` is the primary quality gate — there is no CLI. **Any new store must pass
@@ -84,6 +85,7 @@ pnpm build          # tsup, ESM only
 pnpm typecheck
 pnpm test           # vitest, includes testkit against every store
 pnpm test:coverage  # vitest + v8, 90% gate, fails below threshold
+pnpm examples       # runs every example; CI fails if one breaks
 pnpm pack:check     # publint --strict + attw --profile esm-only
 pnpm lint
 pnpm check          # all of the above, in order
@@ -119,7 +121,8 @@ implemented yet.
 
 - TypeScript `strict`, no `any` in public surface.
 - `src/index.ts` is always a barrel. Implementation goes in named modules, so
-  the coverage exclusion for barrels stays accurate.
+  the coverage exclusion for barrels stays accurate. A package that is *only* a
+  barrel has nothing to measure — give it a real module (see `packages/tsbouncer`).
 - `import type` for type-only imports; prefer `type` imports over value imports.
 - Public API errors extend `AuthorizationError` and carry a stable `code`.
 - Every new public function needs a type test or a runtime test. Prefer both for

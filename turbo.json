@@ -33,6 +33,11 @@
     },
     "lint": {
       "inputs": ["src/**", "test/**"]
+    },
+    "start": {
+      "dependsOn": ["^build"],
+      "inputs": ["src/**", "package.json"],
+      "outputs": []
     }
   }
 }

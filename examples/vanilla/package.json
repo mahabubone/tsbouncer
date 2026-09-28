@@ -1,0 +1,13 @@
+{
+  "name": "@tsbouncer-examples/vanilla",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "The smallest useful tsbouncer model: users, teams, documents.",
+  "scripts": {
+    "start": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "tsbouncer": "workspace:*"
+  }
+}

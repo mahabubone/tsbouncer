@@ -1,0 +1,13 @@
+{
+  "name": "@tsbouncer-examples/json-store",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "tsbouncer": "workspace:*"
+  },
+  "description": "Authorization state in a human-readable, git-friendly JSON file."
+}

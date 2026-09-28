@@ -47,6 +47,12 @@ jobs:
       - name: Test with coverage
         run: pnpm test:coverage
 
+      - name: Run examples
+        # The examples are the documentation, so they are executable and they are
+        # part of the gate: a model that no longer builds fails here, not in a
+        # reader's terminal.
+        run: pnpm examples
+
       - name: Build
         run: pnpm build
 

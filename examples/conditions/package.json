@@ -1,0 +1,13 @@
+{
+  "name": "@tsbouncer-examples/conditions",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "tsbouncer": "workspace:*"
+  },
+  "description": "Attribute-gated access: the tuple binds, the request supplies."
+}

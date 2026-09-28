@@ -6,8 +6,9 @@ Define authorization data, relationships, and policies. `tsbouncer` evaluates ac
 — over pluggable storage, inside your application.
 
 > **Status: pre-alpha.** Nothing is published yet. The model, the store contract, five
-> stores, and a complete check engine are built and tested. `expand`, `listResources`,
-> and `listSubjects` are not implemented. See [PLAN.md](./PLAN.md) for the breakdown.
+> stores, a complete check engine, and a batteries-included package are built and
+> tested. `expand`, `listResources`, and `listSubjects` are not implemented. See
+> [PLAN.md](./PLAN.md) for the breakdown.
 
 ## Why
 
@@ -96,14 +97,19 @@ One primitive is mandatory: a filtered tuple read. Everything else — reverse w
 tuples, they don't decide anything.
 
 ```ts
-import { createAuthz } from '@tsbouncer/core';
-import { memoryStore } from '@tsbouncer/memory';
+import { createDefaultAuthz, defineModel, defineType, permission, relation } from 'tsbouncer';
 
-const authz = createAuthz({ model, store: memoryStore() });
+const authz = createDefaultAuthz({ model });        // in-memory
+// or: createDefaultAuthz({ model, file: './tsbouncer.json' })
 
 await authz.grant({ subject: 'user:alice', relation: 'owner', resource: 'document:123' });
 await authz.can('user:alice', 'document.read', 'document:123'); // true
 ```
+
+`tsbouncer` re-exports the kernel plus the two stores that need no external
+dependency. If you already have Kysely, Drizzle, or Prisma, import `@tsbouncer/core`
+and the matching store — this package deliberately does not depend on any of them,
+and neither should your install graph because you read a README.
 
 Because the contract is that small, it also runs on JSON on disk, or on a SQL database
 through whichever query builder you already use:
@@ -111,7 +117,7 @@ through whichever query builder you already use:
 | package | takes | tested against |
 | --- | --- | --- |
 | `@tsbouncer/memory` | nothing — process-local | in-process |
-| `@tsbouncer/json` | a file path | on disk |
+| `@tsbouncer/json` | a file path | on disk, atomic |
 | `@tsbouncer/kysely` | your `Kysely` instance | SQLite |
 | `@tsbouncer/drizzle` | your `db` and table object | SQLite (sync) and libsql (async) |
 | `@tsbouncer/prisma` | your `PrismaClient` | SQLite via Prisma 7 |
@@ -195,7 +201,19 @@ Not published yet. When it is:
 ```bash
 npm i tsbouncer                    # batteries-included
 npm i @tsbouncer/core              # kernel only, zero dependencies
+npm i @tsbouncer/kysely            # or drizzle / prisma, over your own client
 ```
+
+## Examples
+
+[`examples/`](./examples) holds five runnable programs with assertions — not
+snippets. They run in CI, so they cannot rot into fiction:
+
+```bash
+pnpm examples
+```
+
+`vanilla`, `json-store`, `conditions`, `tuple-to-userset`, `multi-tenant`.
 
 ## Requirements
 

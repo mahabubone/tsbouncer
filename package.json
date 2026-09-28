@@ -18,15 +18,17 @@
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "pack:check": "turbo run pack:check",
-    "check": "pnpm lint && pnpm typecheck && pnpm build && pnpm pack:check && pnpm test:coverage",
+    "check": "pnpm lint && pnpm typecheck && pnpm build && pnpm pack:check && pnpm test:coverage && pnpm examples",
     "test:coverage": "turbo run test:coverage",
-    "coverage": "turbo run test:coverage"
+    "coverage": "turbo run test:coverage",
+    "examples": "turbo run start"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",
     "turbo": "2.11.5",
     "typescript": "5.9.3",
     "@vitest/coverage-v8": "5.0.2",
-    "vitest": "5.0.2"
+    "vitest": "5.0.2",
+    "tsx": "4.23.15"
   }
 }

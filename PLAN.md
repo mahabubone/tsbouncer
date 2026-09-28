@@ -80,8 +80,8 @@ interface KeymanStore {
 | M2 | check engine — direct, userset, union, intersection, exclusion, wildcard · `explain` | low |
 | M3 | TTU traversal (lands the `ttu` node) | **high** |
 | M4 | conditions / ABAC, fail-closed | med |
-| M5 | `jsonStore` (atomic temp+rename) — makes testkit pass again | med |
-| M6 | root `tsbouncer` pkg · docs · examples · release | low |
+| M5 | `jsonStore` (atomic temp+rename) | med |
+| M6 | root `tsbouncer` pkg · examples | low |
 | S1 | `@tsbouncer/kysely` — filtered reads over the app's existing Kysely instance | med |
 | S2 | `@tsbouncer/drizzle` — same, over the app's existing Drizzle instance | med |
 | S3 | `@tsbouncer/prisma` — same, over the app's existing `PrismaClient` | med |
@@ -139,7 +139,8 @@ of which denied access that plainly existed:
 A member's answer is a pure function of `(subject, member, resource)`, so one frame per
 member is both the simplest and the only correct granularity.
 **Cut line:** M1+M2+M5+M6 is a shippable alpha if M3/M4 overrun. They're in v0.1 as you decided; this is only the escape hatch.
-**Status:** M1–M4, S1–S3 shipped. M5 (`jsonStore`) and M6 (root package, docs, release) remain.
+**Status:** M1–M4 and M6's code are shipped; S1–S3 shipped. Still to do: the docs site and the
+release pipeline (changesets, publish, provenance), which were explicitly deferred.
 The engine is complete: ReBAC/RBAC, usersets, wildcards, tuple-to-userset, and conditions.
 
 ### Conditions: what binds and what arrives
@@ -172,7 +173,28 @@ what "conditional" means.
 3. **TTU fan-out is multiplicative.** The node budget must be per-*request*, not per-branch, or a wide graph bypasses it.
 4. **Memo scope.** The per-request memo must be keyed by store identity too — otherwise a `withStore(trx)` call returns results computed against the outer store. This is the subtlest bug available in this design.
 5. **Conditions fail closed.** Missing key, thrown predicate, or unsatisfied -> not allowed, with the reason captured in `explain()`. Tuple-declared params are authoritative; request context only fills gaps.
-6. **JSON write atomicity.** temp file + `fs.rename`, plus a serialized write queue to prevent interleaved mutations.
+6. **JSON write atomicity.** The temp file must be in the *same directory* as the
+   target — `rename` is only atomic within a filesystem and `/tmp` often is not a
+   different one. Mutations are serialized through a promise chain rather than an
+   `await`, so two `grant` calls made without awaiting each other both land. A
+   corrupt file is never silently reset: that turns a typo into an empty database
+   the caller cannot detect.
+
+## What M6 added
+
+`tsbouncer` re-exports the kernel plus the two stores that need no external
+dependency, and adds `createDefaultAuthz({ model, file? })` which picks between
+`jsonStore` and `memoryStore`. It deliberately does **not** depend on Kysely,
+Drizzle, or Prisma: an app that already has one of those should not acquire the
+other two because it read a README.
+
+The store choice is never inferred from the environment. Whether authorization
+state should be durable is a decision about the application.
+
+Examples are real programs with assertions and they run in CI, so they cannot rot
+into fiction. Three of the five were wrong on their first run and the library's own
+write-time validation caught it every time — which is the argument for validating
+at `grant` rather than only at `check`.
 
 ## Quality gates (CI)
 
