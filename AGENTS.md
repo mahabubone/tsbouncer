@@ -114,8 +114,16 @@ returns false all resolve to not allowed with a reason in `explain()`. Do not ma
 of them permissive to "fix" a failing test: a grant nobody checked is the one outcome
 this library must never produce.
 
-`expand`, `listResources`, and `listSubjects` are declared in the API but not
-implemented yet.
+The three graph queries are implemented: `expand`, `listResources`, `listSubjects`.
+Two rules govern them, and both exist because the alternative is a silent lie:
+
+- **Every list reports `truncated`.** A budget that runs out mid-enumeration yields
+  a partial answer, and a bare array cannot distinguish that from a small result
+  set. `listResources` returns `{ resources, truncated }` rather than `string[]` for
+  exactly this reason; do not "simplify" it back to an array.
+- **`listSubjects` is symbolic, not concrete.** A `user:*` grant yields
+  `allOfTypes: ['user']`, not an invented member list. A set that claims to be
+  exhaustive and is not is the list-shaped version of a fail-open bug.
 
 ## Conventions
 

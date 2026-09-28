@@ -1,13 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
   type AuthorizationError,
+  acceptsSubject,
   createAuthz,
   defineCondition,
   defineModel,
   defineType,
+  describeTuple,
   permission,
   relation,
+  type SetNode,
+  type Tuple,
   TupleValidationError,
+  ttu,
+  wildcard,
 } from '../src/index.js';
 import { model, setup } from './fixtures.js';
 import { testStore } from './store.js';
@@ -357,5 +363,168 @@ describe('malformed stored subjects', () => {
       { subject: 'user:alice', relation: 'owner', resource: 'document:1' },
     ]);
     expect(await authz.can('user:alice', 'document.read', 'document:1')).toBe(true);
+  });
+});
+
+/**
+ * Every edge shape `acceptsSubject` has to decide on: a plain direct edge, a
+ * userset, a wildcard-only edge, a delegating relation, an intersection, an
+ * exclusion, and a permission holding a tuple-to-userset.
+ */
+const edgeShapes = defineModel({
+  types: {
+    user: defineType({}),
+    team: defineType({ relations: { member: relation(['user']) } }),
+    folder: defineType({ relations: { viewer: relation(['user']) } }),
+    doc: defineType({
+      relations: {
+        owner: relation(['user']),
+        viaUserset: relation('user').or(relation('team', { through: 'member' })),
+        viaWildcard: relation('user').or(wildcard('user')),
+        onlyWildcard: wildcard('user'),
+        delegating: permission.or('owner'),
+        intersect: permission.allOf('owner', 'delegating'),
+        excepted: permission.allOf('owner').except('banned'),
+        banned: relation('user'),
+        link: relation('folder'),
+      },
+      permissions: { read: permission.or('owner', ttu('link', 'viewer')) },
+    }),
+  },
+});
+
+describe('acceptsSubject', () => {
+  const direct = (type: string, relation?: string) =>
+    relation === undefined ? { type, id: 'x' } : { type, id: 'x', relation };
+
+  const edgeOf = (name: string): SetNode => {
+    const found = edgeShapes.types.doc?.relations[name];
+    if (found === undefined) throw new Error(`model is missing relation ${name}`);
+    return found;
+  };
+  const accepts = (name: string, type: string, relation?: string): boolean =>
+    acceptsSubject(edgeShapes, 'doc', edgeOf(name), direct(type, relation), new Set());
+
+  it('accepts a direct subject of the right type', () => {
+    expect(accepts('owner', 'user')).toBe(true);
+    expect(accepts('owner', 'folder')).toBe(false);
+  });
+
+  it('rejects a grant against a wildcard-only edge', () => {
+    // `user:*` is not something a caller writes a grant against. A relation
+    // that *also* has a plain direct branch still accepts a direct subject, so
+    // the check is per branch rather than per relation.
+    expect(accepts('onlyWildcard', 'user')).toBe(false);
+    expect(accepts('viaWildcard', 'user')).toBe(true);
+  });
+
+  it('accepts a userset the edge names, and only that one', () => {
+    expect(accepts('viaUserset', 'team', 'member')).toBe(true);
+    expect(accepts('viaUserset', 'team', 'owner')).toBe(false);
+  });
+
+  it('follows a delegating relation', () => {
+    expect(accepts('delegating', 'user')).toBe(true);
+    expect(accepts('delegating', 'team')).toBe(false);
+  });
+
+  it('requires every branch of an intersection', () => {
+    expect(accepts('intersect', 'user')).toBe(true);
+    expect(accepts('intersect', 'team')).toBe(false);
+  });
+
+  it('decides an exclusion by its base', () => {
+    // `banned` accepts users too, so requiring both would reject every grant.
+    expect(accepts('excepted', 'user')).toBe(true);
+  });
+
+  it('rejects a subject for a permission holding a tuple-to-userset', () => {
+    // A ttu is an edge on the *resource*, never something a subject carries.
+    // The `or('owner')` branch is checked first and would accept a user, so the
+    // ttu branch itself is what the test pins down.
+    const read = edgeShapes.types.doc?.permissions.read;
+    if (read === undefined) throw new Error('model is missing read');
+    const ttuOnly = defineModel({
+      types: {
+        user: defineType({}),
+        folder: defineType({ relations: { viewer: relation(['user']) } }),
+        doc: defineType({
+          relations: { link: relation('folder') },
+          permissions: { read: permission.or(ttu('link', 'viewer')) },
+        }),
+      },
+    });
+    const node = ttuOnly.types.doc?.permissions.read;
+    if (node === undefined) throw new Error('model is missing read');
+    expect(acceptsSubject(ttuOnly, 'doc', node, direct('user'), new Set())).toBe(false);
+    // Sanity: the mixed permission above does accept one.
+    expect(acceptsSubject(edgeShapes, 'doc', read, direct('user'), new Set())).toBe(true);
+  });
+
+  it('cannot be handed a delegating cycle, because the model rejects one first', () => {
+    // The runtime `seen` guard in acceptsSubject is defence in depth: a
+    // self-referential delegation never survives `defineModel`, so no legal
+    // model can reach it. The build-time check is the real guard.
+    expect(() =>
+      defineModel({
+        types: {
+          user: defineType({}),
+          doc: defineType({
+            relations: {
+              a: permission.or('b'),
+              b: permission.or('a'),
+              owner: relation(['user']),
+            },
+          }),
+        },
+      }),
+    ).toThrow(/cycle/);
+  });
+});
+
+describe('describeTuple', () => {
+  it('renders a tuple readably', () => {
+    const tuple: Tuple = { subject: 'user:alice', relation: 'viewer', resource: 'doc:1' };
+    expect(describeTuple(tuple)).toBe('user:alice#viewer@doc:1');
+  });
+});
+
+describe('the validate flag', () => {
+  const model = defineModel({
+    types: {
+      user: defineType({}),
+      doc: defineType({ relations: { owner: relation(['user']) } }),
+    },
+  });
+
+  it('rejects a tuple against a name the model does not declare', async () => {
+    const authz = createAuthz({ model, store: testStore([]) });
+    await expect(
+      authz.write([{ subject: 'user:alice', relation: 'ghost', resource: 'doc:1' }]),
+    ).rejects.toThrow();
+  });
+
+  it('skips the model check when validation is turned off', async () => {
+    const authz = createAuthz({ model, store: testStore([]), validate: false });
+    // The store takes it; the model never sees it. That is the point of the
+    // flag, and the reason it is not the default.
+    await authz.write([{ subject: 'user:alice', relation: 'ghost', resource: 'doc:1' }]);
+    expect(await authz.can('user:alice', 'doc.owner', 'doc:1')).toBe(false);
+  });
+
+  it('validates a replace as well as a tuple write', async () => {
+    const authz = createAuthz({ model, store: testStore([]) });
+    await expect(
+      authz.delete({
+        kind: 'replace',
+        query: { resource: 'doc:1' },
+        tuples: [{ subject: 'user:alice', relation: 'ghost', resource: 'doc:1' }],
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('leaves a delete unvalidated', async () => {
+    const authz = createAuthz({ model, store: testStore([]) });
+    await expect(authz.delete({ kind: 'tuples', tuples: [] })).resolves.toBeUndefined();
   });
 });

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { createAuthz } from '../src/index.js';
+import {
+  createAuthz,
+  defineModel,
+  defineType,
+  relation,
+  wildcard,
+} from '../src/index.js';
 import { model, setup, T } from './fixtures.js';
 import { testStore } from './store.js';
 
@@ -359,3 +365,25 @@ function flattenOps(
 ): import('../src/index.js').ExplainNode[] {
   return [node, ...node.children.flatMap(flattenOps)];
 }
+
+describe('a wildcard edge', () => {
+  const model = defineModel({
+    types: {
+      user: defineType({}),
+      doc: defineType({ relations: { viewer: relation('user').or(wildcard('user')) } }),
+    },
+  });
+  const authz = createAuthz({
+    model,
+    store: testStore([T('user:*', 'viewer', 'doc:1')]),
+  });
+
+  it('grants to every user of the type', async () => {
+    expect(await authz.can('user:alice', 'doc.viewer', 'doc:1')).toBe(true);
+  });
+
+  it('does not grant to a different type', async () => {
+    // `user:*` covers the user *type*, not every subject in the graph.
+    expect(await authz.can('team:eng', 'doc.viewer', 'doc:1')).toBe(false);
+  });
+});

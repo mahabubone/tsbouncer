@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ModelDefinitionError } from '../src/errors.js';
+import { createAuthz, type Tuple } from '../src/index.js';
 import {
   defineCondition,
   defineModel,
@@ -12,6 +13,7 @@ import {
   typeNames,
   wildcard,
 } from '../src/model.js';
+import { testStore } from './store.js';
 
 const base = defineModel({
   types: {
@@ -462,5 +464,41 @@ describe('builders', () => {
         },
       }),
     ).toThrow(/invalid permission name/);
+  });
+});
+
+describe('a model with no permissions', () => {
+  it('builds, and answers against a relation directly', async () => {
+    const bare = defineModel({
+      types: {
+        user: defineType({}),
+        doc: defineType({ relations: { owner: relation(['user']) } }),
+      },
+    });
+    const authz = createAuthz({
+      model: bare,
+      store: testStore([
+        { subject: 'user:alice', relation: 'owner', resource: 'doc:1' } as Tuple,
+      ]),
+    });
+    expect(await authz.can('user:alice', 'doc.owner', 'doc:1')).toBe(true);
+    expect(authz.permissions('doc')).toEqual([]);
+    expect(authz.relations('doc')).toEqual(['owner']);
+  });
+});
+
+describe('a permission that references a direct edge is rejected at build time', () => {
+  it('names the edge, because tuples are only written against relations', () => {
+    expect(() =>
+      defineModel({
+        types: {
+          user: defineType({}),
+          doc: defineType({
+            relations: { owner: relation(['user']) },
+            permissions: { read: permission.or(relation(['user'])) },
+          }),
+        },
+      }),
+    ).toThrow(/tuples are only written against relations/);
   });
 });

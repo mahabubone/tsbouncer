@@ -71,6 +71,75 @@ describe('public API surface', () => {
     }
   });
 
+  it('exports the graph query engine', () => {
+    for (const name of [
+      'expandSubjects',
+      'listResources',
+      'listSubjects',
+      'set',
+      'union',
+      'intersection',
+      'difference',
+      'differenceAll',
+      'setOfType',
+      'emptySet',
+      'concreteRefs',
+    ] as const) {
+      expect(api[name], name).toBeDefined();
+    }
+  });
+
+  it('answers the three graph queries through the public entry point', async () => {
+    const authz = api.createAuthz({
+      model: api.defineModel({
+        types: {
+          user: api.defineType({}),
+          team: api.defineType({ relations: { member: api.relation(['user']) } }),
+          document: api.defineType({
+            relations: {
+              owner: api.relation(['user']),
+              viewer: api.relation('user'),
+              // A wildcard lives on a *relation*; a permission may only
+              // reference one, never contain the edge itself.
+              open: api.relation('user').or(api.wildcard('user')),
+            },
+            permissions: {
+              read: api.permission.or('owner', 'viewer'),
+              anyone: api.permission.or('owner', 'open'),
+            },
+          }),
+        },
+      }),
+      store: testStore([
+        { subject: 'user:alice', relation: 'owner', resource: 'document:1' },
+        { subject: 'team:eng#member', relation: 'viewer', resource: 'document:1' },
+        { subject: 'user:alice', relation: 'member', resource: 'team:eng' },
+        { subject: 'user:*', relation: 'open', resource: 'document:1' },
+      ]),
+    });
+
+    const resources = await authz.listResources({
+      subject: 'user:alice',
+      permission: 'document.read',
+    });
+    // The shape is the contract: a bare array could not say it was partial.
+    expect(resources).toEqual({ resources: ['document:1'], truncated: false });
+
+    const subjects = await authz.listSubjects({
+      permission: 'document.anyone',
+      resource: 'document:1',
+    });
+    // Symbolic, not invented: the `user:*` edge on `open` covers alice, so the
+    // answer is the *type*, and alice's own grant is subsumed by it rather
+    // than listed alongside it.
+    expect(subjects.allOfTypes).toEqual(['user']);
+    expect(subjects.members).toEqual([]);
+    expect(subjects.truncated).toBe(false);
+
+    const expanded = await authz.expand({ subject: 'team:eng#member' });
+    expect(expanded.subjects).toEqual(['user:alice']);
+  });
+
   it('exports every error class and the type guard', () => {
     for (const name of [
       'AuthorizationError',

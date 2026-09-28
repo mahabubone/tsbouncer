@@ -410,7 +410,7 @@ function validateCrossType(types: Readonly<Record<string, TypeDefinition>>): voi
           }
           case 'ttu': {
             const through = relations[child.through];
-            const targets = through ? directTargets(through) : [];
+            const targets = through ? directTargets(types, typeName, through) : [];
             if (targets.length === 0) {
               throw new ModelDefinitionError(
                 `tuple-to-userset ${child.through}.${child.target} on type ${JSON.stringify(typeName)} must traverse a relation that yields objects, but ${JSON.stringify(child.through)} has no direct target type`,
@@ -453,13 +453,31 @@ function validateCrossType(types: Readonly<Record<string, TypeDefinition>>): voi
  * 'member' })` contributes nothing — that one points at *subjects*, not at an
  * object we can then ask a question of.
  */
-function directTargets(node: SetNode): string[] {
+function directTargets(
+  types: Readonly<Record<string, TypeDefinition>>,
+  typeName: string,
+  node: SetNode,
+  seen: Set<string> = new Set(),
+): string[] {
   switch (node.kind) {
     case 'direct':
       return [node.type];
     case 'union':
     case 'intersection':
-      return [...new Set(node.children.flatMap(directTargets))];
+      return [
+        ...new Set(node.children.flatMap((c) => directTargets(types, typeName, c, seen))),
+      ];
+    // A relation may delegate to another member of its own type, and a
+    // tuple-to-userset can traverse through that delegate. Resolving the
+    // reference needs the built types, so it is followed rather than treated as
+    // a dead end that would reject a legal model.
+    case 'computed': {
+      const key = `${typeName}#${node.name}`;
+      if (seen.has(key)) return [];
+      seen.add(key);
+      const target = types[typeName]?.relations[node.name];
+      return target === undefined ? [] : directTargets(types, typeName, target, seen);
+    }
     default:
       return [];
   }

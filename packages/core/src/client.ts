@@ -3,6 +3,13 @@ import { evaluate } from './evaluate.js';
 import type { ExplainResult } from './explain.js';
 import { type EvaluationLimits, resolveLimits } from './limits.js';
 import type { ConditionContext, Model } from './model.js';
+import type { ResourceList } from './query.js';
+import {
+  type ExpandResult,
+  expandSubjects,
+  listResources as listResourcesFor,
+  listSubjects as listSubjectsFor,
+} from './query.js';
 import { formatPermission, parsePermission, parseRef, WILDCARD } from './refs.js';
 import {
   assertStoreShape,
@@ -11,6 +18,7 @@ import {
   type Tuple,
   type WriteMode,
 } from './store.js';
+import type { SubjectSet } from './subjectset.js';
 import { validateTuples } from './write.js';
 
 export interface CreateAuthzOptions {
@@ -40,6 +48,20 @@ export interface Decision {
   readonly resource: string;
 }
 
+export type { ResourceList };
+
+export interface ListResourcesQuery {
+  readonly subject: string;
+  readonly permission: string;
+  readonly context?: ConditionContext | undefined;
+}
+
+export interface ListSubjectsQuery {
+  readonly permission: string;
+  readonly resource: string;
+  readonly context?: ConditionContext | undefined;
+}
+
 export interface GrantInput {
   readonly subject: string;
   readonly relation: string;
@@ -56,6 +78,16 @@ export interface Authz {
   check(request: CheckRequest, options?: CheckOptions): Promise<Decision>;
   assert(request: CheckRequest, options?: CheckOptions): Promise<void>;
   explain(request: CheckRequest, options?: CheckOptions): Promise<ExplainResult>;
+
+  /**
+   * Every concrete subject a userset contains, transitively. A wildcard expands
+   * to itself rather than to an invented list.
+   */
+  expand(request: { subject: string }): Promise<ExpandResult>;
+  /** Every resource on which `subject` holds `permission`. */
+  listResources(request: ListResourcesQuery): Promise<ResourceList>;
+  /** Everyone who holds `permission` on `resource`, possibly symbolically. */
+  listSubjects(request: ListSubjectsQuery): Promise<SubjectSet>;
 
   grant(input: GrantInput): Promise<void>;
   write(tuples: readonly Tuple[], mode?: WriteMode): Promise<void>;
@@ -130,6 +162,39 @@ export function createAuthz(options: CreateAuthzOptions): Authz {
         tree: outcome.tree,
         reads: outcome.reads,
       };
+    },
+
+    expand(request) {
+      return expandSubjects(model, store, request.subject, limits);
+    },
+
+    async listResources(request) {
+      const { member, type } = splitPermission(model, request.permission);
+      return listResourcesFor(
+        model,
+        store,
+        {
+          subject: request.subject,
+          member,
+          resourceType: type,
+        },
+        limits,
+      );
+    },
+
+    async listSubjects(request) {
+      const { member, type } = splitPermission(model, request.permission);
+      parseRef(request.resource, 'object');
+      return listSubjectsFor(
+        model,
+        store,
+        {
+          member,
+          resource: request.resource,
+          resourceType: type,
+        },
+        limits,
+      );
     },
 
     async grant(input) {
@@ -237,6 +302,31 @@ function resolveRequest(model: Model, request: CheckRequest): ResolvedRequest {
     resource,
     resourceRef: request.resource,
   };
+}
+
+/** Split `type.permission` and check the model actually declares it. */
+function splitPermission(
+  model: Model,
+  permission: string,
+): { type: string; member: string } {
+  const parsed = parsePermission(permission);
+  const definition = model.types[parsed.type];
+  if (definition === undefined) {
+    throw new InvalidReferenceError(
+      `permission ${JSON.stringify(permission)} names a type the model does not declare`,
+      { type: parsed.type },
+    );
+  }
+  if (
+    definition.relations[parsed.permission] === undefined &&
+    definition.permissions[parsed.permission] === undefined
+  ) {
+    throw new InvalidReferenceError(
+      `type ${JSON.stringify(parsed.type)} declares no relation or permission named ${JSON.stringify(parsed.permission)}`,
+      { type: parsed.type, permission: parsed.permission },
+    );
+  }
+  return { type: parsed.type, member: parsed.permission };
 }
 
 async function decide(

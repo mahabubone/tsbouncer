@@ -157,3 +157,24 @@ describe('parsePermission', () => {
     expect(() => parsePermission('document#read')).toThrow(InvalidReferenceError);
   });
 });
+
+describe('parseRef', () => {
+  it('rejects a malformed reference rather than guessing', () => {
+    expect(() => parseRef('nope')).toThrow(/missing ':'/);
+    expect(() => parseRef('user:')).toThrow();
+    expect(() => parseRef('User:alice')).toThrow(/invalid type/);
+    expect(() => parseRef('team:eng#a#b')).toThrow(/more than one '#'/);
+  });
+
+  it('reads the three reference positions', () => {
+    // A wildcard is an id, not a separate flag: `user:*` is the one id that
+    // stands for a class rather than a thing.
+    expect(parseRef('user:alice')).toEqual({ type: 'user', id: 'alice' });
+    expect(parseRef('team:eng#member')).toEqual({
+      type: 'team',
+      id: 'eng',
+      relation: 'member',
+    });
+    expect(parseRef('user:*')).toEqual({ type: 'user', id: '*' });
+  });
+});

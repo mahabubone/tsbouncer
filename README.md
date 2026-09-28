@@ -6,9 +6,8 @@ Define authorization data, relationships, and policies. `tsbouncer` evaluates ac
 — over pluggable storage, inside your application.
 
 > **Status: pre-alpha.** Nothing is published yet. The model, the store contract, five
-> stores, a complete check engine, and a batteries-included package are built and
-> tested. `expand`, `listResources`, and `listSubjects` are not implemented. See
-> [PLAN.md](./PLAN.md) for the breakdown.
+> stores, a complete check engine, a batteries-included package, and the three graph
+> queries are built and tested. See [PLAN.md](./PLAN.md) for the breakdown.
 
 ## Why
 
@@ -95,6 +94,38 @@ your `users` table, and never needs a foreign key into your domain schema.
 One primitive is mandatory: a filtered tuple read. Everything else — reverse walks,
 `expand`, `listResources` — is derived by the engine. Stores stay dumb; they move
 tuples, they don't decide anything.
+
+## Graph queries
+
+`expand`, `listResources`, and `listSubjects` are the three reads that answer a
+question about a whole graph rather than one edge.
+
+```ts
+const { resources, truncated } = await authz.listResources({
+  subject: 'user:alice',
+  permission: 'document.read',
+});
+```
+
+Every list carries a `truncated` flag, and it is not decoration. A query that runs
+out of budget part-way returns a partial answer; a bare array cannot say "these are
+some of them", so the list would be indistinguishable from a small one and a caller
+treating it as authoritative would under-grant silently. The same applies to
+`listSubjects`, whose `SubjectSet` reports truncation on the set itself.
+
+`listSubjects` is the one query that is deliberately *not* concrete. When a grant
+covers a class of subjects — `user:*`, or a whole relation on another type — the
+answer is symbolic, because inventing a member list would be a guess:
+
+```ts
+const { allOfTypes, members, excluded } = await authz.listSubjects({
+  permission: 'document.read',
+  resource: 'document:1',
+});
+// allOfTypes: ['user']  — "any user", not a list of users
+// members:     ['user:alice', 'team:eng#member']
+// excluded:    ['user:mallory']  — the `except` side, not flattened away
+```
 
 ```ts
 import { createDefaultAuthz, defineModel, defineType, permission, relation } from 'tsbouncer';

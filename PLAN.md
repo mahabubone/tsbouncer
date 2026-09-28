@@ -56,7 +56,9 @@ createAuthz({ model, store })
 //             check({subject,permission,resource}, {context}) -> Decision
 //             assert(...) -> throws AuthorizationError
 //             explain(...) -> { allowed, tree, ... }  |  format(e) -> string
-// graph       expand · listResources · listSubjects
+// graph       expand({subject})
+//             listResources({subject,permission}) -> { resources, truncated }
+//             listSubjects({permission,resource}) -> SubjectSet { allOfTypes, members, excluded, truncated }
 // model       authz.model · .types · .relations · .permissions
 // scoping     authz.withStore(trx)   // app-owned transactions
 ```

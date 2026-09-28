@@ -289,3 +289,78 @@ describe('formatExplain branches', () => {
     expect(formatExplain(result)).toMatch(/\d+ reads?/);
   });
 });
+
+describe('formatExplain', () => {
+  const node = (op: ExplainNode['op'], result: boolean): ExplainNode => ({
+    op,
+    result,
+    children: [],
+    tuples: [],
+  });
+
+  const render = (op: ExplainNode['op'], result: boolean, reads = 0): string =>
+    formatExplain({
+      allowed: result,
+      subject: 'user:alice',
+      permission: 'document.read',
+      resource: 'document:1',
+      tree: node(op, result),
+      reads,
+    });
+
+  it.each([
+    ['direct', 'direct'],
+    ['userset', 'userset'],
+    ['union', 'union'],
+    ['intersection', 'intersection'],
+    // The formatter says "except", not "exclusion" — the domain word.
+    ['exclusion', 'except'],
+    ['condition', 'condition'],
+    ['cycle', 'cycle'],
+    ['limit', 'limit'],
+  ] as const)('renders a %s node as %s', (op, label) => {
+    expect(render(op, false)).toContain(label);
+  });
+
+  it('renders a computed node by the member it names', () => {
+    const text = formatExplain({
+      allowed: true,
+      subject: 'user:alice',
+      permission: 'document.read',
+      resource: 'document:1',
+      tree: { op: 'computed', result: true, children: [], tuples: [], name: 'owner' },
+      reads: 0,
+    });
+    expect(text).toContain('owner');
+  });
+
+  it('names both ends of a tuple-to-userset', () => {
+    const text = formatExplain({
+      allowed: true,
+      subject: 'user:alice',
+      permission: 'document.read',
+      resource: 'document:1',
+      tree: {
+        op: 'ttu',
+        result: true,
+        children: [],
+        tuples: [],
+        through: 'parent',
+        target: 'read',
+      },
+      reads: 0,
+    });
+    expect(text).toContain('ttu parent.read');
+  });
+
+  it('marks a bare node with a sign', () => {
+    expect(render('direct', true)).toContain('+ direct');
+    expect(render('direct', false)).toContain('- direct');
+  });
+
+  it('omits the read count when there were none', () => {
+    expect(render('direct', true, 0)).not.toContain('reads');
+    expect(render('direct', true, 1)).toContain('1 read');
+    expect(render('direct', true, 2)).toContain('2 reads');
+  });
+});
