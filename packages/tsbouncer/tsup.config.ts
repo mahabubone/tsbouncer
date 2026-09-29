@@ -12,7 +12,7 @@ export default defineConfig({
     defaults: 'src/defaults.ts',
   },
   format: ['esm'],
-  target: 'node20.11',
+  target: 'node22',
   platform: 'neutral',
   dts: true,
   sourcemap: true,
