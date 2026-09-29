@@ -382,6 +382,24 @@
   }
 
   .prose-docs pre code {
+    /*
+     * `block`, and this is load-bearing.
+     *
+     * The horizontal padding lives here rather than on the `<pre>` because the
+     * pre is the scroll container, and a scroll container's padding does not
+     * move with its content — text would slide out from under it. On an *inline*
+     * box, though, padding applies only to the first and last line box, so every
+     * line in between started 1rem to the left of the first one. 1rem is 16px and
+     * a 2-space indent in 13px monospace is 15.6px, so the indent was cancelled
+     * almost exactly: `import` and `createAuthz,` landed on the same pixel column
+     * and the snippet read as unindented. Making the code a block applies the
+     * padding to every line.
+     *
+     * Not `grid`, which is the usual trick for Shiki's `.line` spans: a grid item
+     * with no content has no height, so every blank line in every snippet would
+     * silently disappear.
+     */
+    display: block;
     font-family: var(--font-mono);
     background: none;
     border: 0;
