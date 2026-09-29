@@ -1,6 +1,6 @@
 {
   "name": "@tsbouncer/memory",
-  "version": "0.0.0",
+  "version": "1.0.0-dev.0",
   "description": "Process-local TupleStore. Ideal for isolated tests.",
   "license": "MIT",
   "type": "module",

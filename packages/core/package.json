@@ -1,6 +1,6 @@
 {
   "name": "@tsbouncer/core",
-  "version": "0.0.0",
+  "version": "1.0.0-dev.0",
   "description": "Authorization graph kernel. Zero dependencies, zero node:* imports, ESM only.",
   "license": "MIT",
   "type": "module",

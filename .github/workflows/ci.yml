@@ -38,6 +38,11 @@ jobs:
         # `test` script also regenerates, but `build`/`pack:check` need it to exist.
         run: pnpm --filter @tsbouncer/prisma exec prisma generate --schema prisma/schema.prisma
 
+      - name: Versions
+        # Eight packages drifting to seven versions is how a consumer ends up with
+        # two copies of the kernel. Zero dependencies, no extra runner.
+        run: pnpm versions
+
       - name: Lint
         run: pnpm lint
 
@@ -67,3 +72,15 @@ jobs:
           path: 'packages/*/coverage/lcov.info'
           include-hidden-files: true
           if-no-files-found: warn
+
+      - name: Upload the contract report
+        # "What does this library actually guarantee?" should be answerable by
+        # opening one file, without reading the implementation. Same job, same
+        # runner — an artifact is not worth a new machine.
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-report
+          path: 'packages/testkit/coverage/contract/report.md'
+          include-hidden-files: true
+          if-no-files-found: error

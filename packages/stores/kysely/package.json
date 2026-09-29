@@ -1,6 +1,6 @@
 {
   "name": "@tsbouncer/kysely",
-  "version": "0.0.0",
+  "version": "1.0.0-dev.0",
   "description": "TupleStore over an application-owned Kysely instance.",
   "license": "MIT",
   "type": "module",

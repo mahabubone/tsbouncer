@@ -1,6 +1,6 @@
 {
   "name": "tsbouncer",
-  "version": "0.0.0",
+  "version": "1.0.0-dev.0",
   "description": "The bouncer for TypeScript/JS ESM-only apps. Authorization graph SDK with pluggable storage.",
   "license": "MIT",
   "type": "module",

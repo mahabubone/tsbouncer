@@ -286,6 +286,36 @@ file, and SQLite from the same application code.
 
 After that, [`vanilla`](./examples/vanilla) is the shortest useful program.
 
+## What this library guarantees
+
+Every claim below is a clause in a contract, checked against a real store on every
+CI run, and the report is uploaded as an artifact. It is a list you can read
+without opening the evaluator.
+
+```
+contract summary
+  ✓ engine guarantees  21/21
+  ✓ store guarantees  4/4
+```
+
+- A direct grant allows the subject that holds it, and nobody else.
+- Naming a group grants the group object, not the people in it.
+- `user:*` reaches every subject of that type, including ones that do not exist yet.
+- An exclusion removes an access its own base granted, and short-circuiting is the
+  bug this shape exists to prevent.
+- Declaring a wildcard edge is not a grant: it matches a stored `user:*` and nothing
+  else, so an empty ban list bans nobody.
+- Permission flows from an ancestor to its descendants, and not upward.
+- A tuple's bound parameters are authoritative. A request cannot rewrite the
+  constraint the grant was written with.
+- A missing key, a mistyped key, an undeclared condition, and a predicate that
+  throws all deny.
+- A cycle terminates and denies.
+- `listResources` and `listSubjects` never contradict `check` — including for
+  conditional grants, which is where they used to.
+- A store that over-matches, or that drops condition bindings, is rejected by the
+  golden dataset rather than passing its own suite.
+
 ## Requirements
 
 ESM only. No CommonJS build, no dual package, no `require()`. Node `>=20.11`.

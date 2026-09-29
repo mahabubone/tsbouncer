@@ -317,6 +317,13 @@ export function storeConformance(options: ConformanceOptions): void {
   });
 }
 
+export type {
+  Clause,
+  ClauseResult,
+  Contract,
+  Report,
+} from './contract.js';
+export { contract, formatReport, runContract, summarise } from './contract.js';
 export type { GoldenCheck, GoldenOutcome } from './golden.js';
 export {
   assertGolden,

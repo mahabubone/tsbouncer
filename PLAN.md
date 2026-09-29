@@ -270,6 +270,31 @@ was found rather than by design:
   nothing. `testkit/test/` now builds deliberately broken stores — one whose filter
   returns every row, one that drops `condition` bindings — and asserts the golden
   suite rejects both. A gate that has only ever seen honest stores is untested.
+- **The contract report.** `testkit/src/contract.ts` is a shape for expectations
+  that state a guarantee in words, run against a real implementation, and report a
+  pass or fail per clause. `packages/testkit/coverage/contract/report.md` is uploaded
+  by the existing CI job. The unit suite proves the same things and says less: a
+  clause reads `expect: an exclusion removes an access its own base granted`, which
+  is answerable without reading the evaluator. A clause that throws fails, because a
+  contract that treats a crash as a pass reports green on a broken library.
+
+  It is not a test framework — no discovery, no fixtures, no mocking, no lifecycle.
+  It exists because the pitch is a list of guarantees, and a list of guarantees
+  should be readable without the source.
+
+## Release state
+
+All eight packages carry `1.0.0-dev.0` and `pnpm versions` fails the build if they
+drift. There is no publish automation and none is planned yet: the release is a
+hand-cut `npm publish` per package plus a git tag. That is deliberate while the API
+is still moving — a changelog tool that computes versions from commit messages
+would give a false impression of a settled API.
+
+Postgres and MySQL are **not** tested. `DIALECTS` claims all three and only SQLite
+and libsql run in CI, so "swap adapters without migrating data" is verified across
+query builders and *not* across databases — which is where `insert` vs `upsert`
+actually diverges. Testing them needs a running server, which is the one thing this
+project does not want to spend CI minutes on yet.
 
 ## Phase 0 cleanup
 

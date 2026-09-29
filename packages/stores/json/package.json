@@ -1,6 +1,6 @@
 {
   "name": "@tsbouncer/json",
-  "version": "0.0.0",
+  "version": "1.0.0-dev.0",
   "description": "A TupleStore over a single human-readable JSON file. Local dev, fixtures, and small tools.",
   "license": "MIT",
   "type": "module",
