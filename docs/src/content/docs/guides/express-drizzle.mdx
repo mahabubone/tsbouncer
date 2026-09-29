@@ -8,225 +8,504 @@ kind: guide
 
 import Callout from '~/components/Callout.astro';
 
-A product that outgrew `owner_id`: a role system from the old monolith, a folder tree
-from the file manager, sharing, legal hold, data residency, a seat limit, and an
-account suspension switch. All live at once, over a real database.
+You will build a documents API the way real ones grow: a role system from the
+old monolith, a folder tree from the file manager, sharing, a ban list, a legal
+hold, data residency, a seat limit, and an account suspension switch — all live
+at once, over a real database. Install, schema, model, seed, caller, routes,
+run, verify.
+
+## Install
 
 ```bash
-pnpm --filter @tsbouncer-examples/express-drizzle start
-pnpm --filter @tsbouncer-examples/express-drizzle test
+mkdir docs-app && cd docs-app
+npm init -y && npm pkg set type=module
+npm i express drizzle-orm better-sqlite3 tsbouncer @tsbouncer/drizzle
+npm i -D tsx typescript @types/node @types/express @types/better-sqlite3
 ```
 
-Source: [`examples/express-drizzle`](https://github.com/tsbouncer/tsbouncer/tree/main/examples/express-drizzle) ·
-[model](https://github.com/tsbouncer/tsbouncer/blob/main/examples/express-drizzle/src/model.ts) ·
-[seed](https://github.com/tsbouncer/tsbouncer/blob/main/examples/express-drizzle/src/seed.ts) ·
-[caller](https://github.com/tsbouncer/tsbouncer/blob/main/examples/express-drizzle/src/http.ts) ·
-[routes](https://github.com/tsbouncer/tsbouncer/blob/main/examples/express-drizzle/src/app.ts) ·
-[migration](https://github.com/tsbouncer/tsbouncer/blob/main/examples/express-drizzle/drizzle/0000_init.sql)
+Node 22 or newer. Everything below assumes that directory.
 
 ## The structural decision
 
-**Domain rows in your tables, access edges in the tuple table.** A `documents` table
-knows its title and its folder. It does not know who may read it, and there is no
-`owner_id` column to migrate every time the access rules change. The two halves share
-nothing but a string.
+**Domain rows in your tables, access edges in the tuple table.** A `documents`
+table knows its title and its folder. It does not know who may read it, and
+there is no `owner_id` column to migrate every time the access rules change. The
+two halves share opaque ids — `document:1` means the row with `id = 1` — and
+that is all the coupling there is.
 
 ```ts ts-skip
-// src/db/schema.ts
+// src/db/schema.ts — your tables, plus one factory call.
 import { sqliteTsbouncerTuples } from '@tsbouncer/drizzle';
+import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
+// The authorization table, built by the store's factory rather than declared
+// by hand: the store and the schema are the same object, because Drizzle
+// builds its SQL from the column metadata on this exact instance.
 export const tsbouncerTuples = sqliteTsbouncerTuples();
+
+export const documents = sqliteTable('documents', {
+  id: text('id').notNull().primaryKey(),
+  folderId: text('folder_id').notNull(),
+  title: text('title').notNull(),
+  region: text('region').notNull(),
+  onHold: integer('on_hold', { mode: 'boolean' }).notNull().default(false),
+});
 ```
 
-That is a *factory* rather than an exported constant so the table is declared in the
-module your migration tool reads, and so the store and the schema are guaranteed to be
-the same object — `drizzleStore(db, tsbouncerTuples)` is handed this exact instance,
-because Drizzle builds its SQL from the column metadata on it.
+Open the database with two handles that are not interchangeable: `db`, the
+Drizzle client the application queries with, and `store`, the tuple store that
+answers filtered reads. The application brings its own ORM; authorization needs
+one primitive, not a rewrite of the data layer:
 
-## Three conditions, and why they are a list
+```ts ts-skip
+import Database from 'better-sqlite3';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { drizzleStore } from '@tsbouncer/drizzle';
+
+const raw = new Database('./app.db');
+const db = drizzle(raw, { schema: { documents, tsbouncerTuples } });
+const authz = createAuthz({ model, store: drizzleStore(db, tsbouncerTuples) });
+```
+
+## The model, accumulated
+
+`src/model.ts`, in full. RBAC for the old roles, ReBAC for the tree and the
+teams, ABAC for residency, suspension, and seats — and the interesting part is
+where they interact:
 
 ```ts setup
-import { defineCondition, permission } from 'tsbouncer';
+import {
+  createAuthz,
+  defineCondition,
+  defineModel,
+  defineType,
+  permission,
+  relation,
+  ttu,
+  wildcard,
+} from 'tsbouncer';
+import { memoryStore } from 'tsbouncer/memory';
+import assert from 'node:assert/strict';
 ```
 
-```ts ts-fragment
-conditions: {
-  // The writer bound the region when the document was shared. The caller's region
-  // is not in the store at all, so it arrives with the request.
-  sameRegion: defineCondition(
-    'sameRegion',
-    (ctx) => {
-      const { region, callerRegion } = ctx;
-      if (typeof region !== 'string' || typeof callerRegion !== 'string') return false;
-      return region === callerRegion;
-    },
-    { params: { region: 'string' as const } },
-  ),
+```ts
+export const model = defineModel({
+  types: {
+    user: defineType({}),
 
-  // No bound parameters, so no grant can rescue a suspended account.
-  notSuspended: defineCondition('notSuspended', (ctx) => ctx.suspended === false, {
-    params: {},
-  }),
+    team: defineType({
+      relations: { member: relation('user') },
+    }),
 
-  // Both halves at once. The grant carries the allowance the project was bought
-  // with; the request carries what the tenant is using now.
-  withinSeatBudget: defineCondition(
-    'withinSeatBudget',
-    (ctx) => {
-      const { seats, usedSeats } = ctx;
-      if (typeof seats !== 'number' || typeof usedSeats !== 'number') return false;
-      return usedSeats < seats;
-    },
-    { params: { seats: 'number' as const } },
-  ),
-},
+    role: defineType({
+      relations: { holder: relation('user') },
+    }),
+
+    project: defineType({
+      relations: {
+        owner: relation('user'),
+        admin: relation('user').or(relation('role', { through: 'holder' })),
+        editor: relation('user')
+          .or(relation('role', { through: 'holder' }))
+          .or(relation('team', { through: 'member' })),
+        banned: relation('user'),
+      },
+      permissions: {
+        read: permission.or('owner', 'admin', 'editor'),
+        // Both branches of the union are checked against the ban: a banned
+        // admin is refused even though the admin edge resolved.
+        publish: permission.or('owner', 'admin', 'editor').except('banned'),
+      },
+    }),
+
+    // A tree. `parent` is a relation on the *child*: folder:eng's parent is
+    // folder:root. Access flows *down* through `ttu`, because the only way to
+    // inherit is to walk from the child to its parent and ask the same
+    // question there.
+    folder: defineType({
+      relations: {
+        owner: relation('user').or(relation('team', { through: 'member' })),
+        parent: relation('folder'),
+        viewer: relation('user').or(relation('team', { through: 'member' })),
+        banned: relation('user'),
+      },
+      permissions: {
+        read: permission.or('owner', 'viewer', ttu('parent', 'read')),
+        write: permission.or('owner', ttu('parent', 'write')),
+      },
+    }),
+
+    document: defineType({
+      relations: {
+        owner: relation('user'),
+        editor: relation('user')
+          .or(relation('role', { through: 'holder' }))
+          .or(relation('team', { through: 'member' })),
+        viewer: relation('user')
+          .or(relation('role', { through: 'holder' }))
+          .or(relation('team', { through: 'member' })),
+        // A share list that can name people and can also be flipped to
+        // everyone. The direct edge is not decoration: a bare wildcard edge
+        // accepts no direct subject, so `user:*` would be rejected at write
+        // time without it.
+        shared: relation('user').or(wildcard('user')),
+        approver: relation('user').or(relation('role', { through: 'holder' })),
+        parent: relation('folder'),
+        banned: relation('user'),
+      },
+      permissions: {
+        read: permission
+          .or('owner', 'editor', 'viewer', 'shared', ttu('parent', 'read'))
+          .except('banned'),
+        write: permission.or('owner', 'editor', ttu('parent', 'write')).except('banned'),
+        approve: permission.or('approver'),
+        // Segregation of duties: the owner *and* an approver, so a compromised
+        // owner account cannot publish alone. An AND of two relations on the
+        // same document — not a two-person workflow; the route adds the
+        // second-person requirement separately.
+        publish: permission.allOf('owner', 'approver').except('banned'),
+      },
+    }),
+  },
+  // Three conditions: one bound by the writer, one decided only by request
+  // state, one mixing both. Every failure path denies.
+
+  conditions: {
+    // Data residency, the writer-bound half. `region` was decided when the
+    // document was shared and is stored with the grant; the caller's region
+    // arrives with the request. A request may fill a missing key but can never
+    // overwrite a bound one — if a caller could rewrite `region`, the
+    // condition would be theatre.
+    sameRegion: defineCondition(
+      'sameRegion',
+      (ctx) => {
+        const { region, callerRegion } = ctx;
+        if (typeof region !== 'string' || typeof callerRegion !== 'string') return false;
+        return region === callerRegion;
+      },
+      { params: { region: 'string' as const } },
+    ),
+
+    // Suspension, the request-only half. No bound parameters, so no grant can
+    // rescue a suspended account — and a missing key denies rather than passes.
+    notSuspended: defineCondition('notSuspended', (ctx) => ctx.suspended === false, {
+      params: {},
+    }),
+
+    // Both halves at once. The grant carries the allowance the project was
+    // bought with; the request carries what the tenant is using right now.
+    withinSeatBudget: defineCondition(
+      'withinSeatBudget',
+      (ctx) => {
+        const { seats, usedSeats } = ctx;
+        if (typeof seats !== 'number' || typeof usedSeats !== 'number') return false;
+        return usedSeats < seats;
+      },
+      { params: { seats: 'number' as const } },
+    ),
+  },
+});
 ```
 
-Every failure path denies: an undeclared condition, a missing or mistyped parameter, a
-predicate that returns false. There is no permissive fallback anywhere, and a
-predicate that throws is a denial rather than an exception in your route.
+<Callout type="caution" title="Two shapes worth reading twice">
+A `parent` tuple names the parent as its **subject** — `{ subject: 'folder:root',
+relation: 'parent', resource: 'folder:eng' }` reads "eng's parent is root".
+Written the other way round it validates cleanly, and then every inheritance
+rule resolves to nothing with no error anywhere.
 
-<Callout type="caution" title="The safety of ABAC is the application's job">
-  A request may fill in a condition's *unbound* parameters. So the only safe source of
-  those parameters is your own database. `src/http.ts` builds the context from the
-  `users` and `organizations` tables and never reads a request parameter into it, and
-  there is a scenario that tries to forge it:
-
-  ```
-  a client cannot forge the context it is judged against   403
-  ```
-
-  Bound parameters are the opposite: a grant's own `context` is authoritative, and a
-  request supplying the same key is ignored rather than winning.
+And `document.write` deliberately has **no** `shared` branch: a published
+document is readable by everyone and writable by almost no one. Read the union
+before you extend it.
 </Callout>
 
-## Three rules that are easy to get wrong
+## Seed the graph
 
-**A `parent` tuple names the parent as its subject.**
+Domain rows go in as plain inserts; the access graph goes in through
+`authz.write`, because that is the only path that runs write-time validation —
+a tuple naming a relation the model does not declare fails here at boot rather
+than denying silently forever:
 
-Read that as: *folder:eng's parent is folder:root*.
+```ts
+const authz = createAuthz({ model, store: memoryStore() });
 
-```ts ts-fragment
-subject: 'folder:root',
-relation: 'parent',
-resource: 'folder:eng',
+await authz.write([
+  { subject: 'user:alice', relation: 'holder', resource: 'role:acme:admin' },
+  { subject: 'user:bob', relation: 'member', resource: 'team:platform' },
+  { subject: 'team:platform#member', relation: 'viewer', resource: 'folder:eng' },
+  { subject: 'user:alice', relation: 'owner', resource: 'folder:root' },
+  { subject: 'folder:root', relation: 'parent', resource: 'folder:eng' },
+  { subject: 'folder:eng', relation: 'parent', resource: 'document:1' },
+  { subject: 'user:alice', relation: 'owner', resource: 'document:1' },
+  // Mallory owns document 2 and is banned from it. Both grants are real;
+  // the ban wins because `except` evaluates both sides.
+  { subject: 'user:mallory', relation: 'owner', resource: 'document:2' },
+  { subject: 'user:mallory', relation: 'banned', resource: 'document:2' },
+  // Document 5 is public, except for Mallory.
+  { subject: 'user:*', relation: 'shared', resource: 'document:5' },
+  { subject: 'user:mallory', relation: 'banned', resource: 'document:5' },
+  // The second key of the dual-key publish rule.
+  { subject: 'user:alice', relation: 'holder', resource: 'role:acme:compliance' },
+  { subject: 'role:acme:compliance#holder', relation: 'approver', resource: 'document:1' },
+  // One condition per grant, each with a different story.
+  {
+    subject: 'user:dave',
+    relation: 'viewer',
+    resource: 'document:1',
+    condition: 'sameRegion',
+    context: { region: 'eu' },
+  },
+  {
+    subject: 'user:erin',
+    relation: 'viewer',
+    resource: 'document:4',
+    condition: 'notSuspended',
+  },
+  {
+    subject: 'user:carol',
+    relation: 'viewer',
+    resource: 'document:4',
+    condition: 'notSuspended',
+  },
+  {
+    subject: 'user:dana',
+    relation: 'viewer',
+    resource: 'document:1',
+    condition: 'withinSeatBudget',
+    context: { seats: 5 },
+  },
+]);
 ```
 
-The evaluator resolves `ttu('parent', …)` by reading `{ relation: 'parent', resource: <this object> }`
-and taking the *subject* of what it finds. Written the other way round it validates
-cleanly, and then every inheritance rule in the system resolves to nothing with no
-error anywhere.
+## The caller, and where context comes from
 
-**A wildcard edge accepts no direct subject.** `shared: wildcard('user')` rejects
-`user:*` at write time, so a relation that has to hold a wildcard also declares the
-direct edge: `shared: relation('user').or(wildcard('user'))`. Which is what you want
-anyway — a share list that can name people and can also be flipped to everyone.
-
-**A ban beats the wildcard, and beats ownership.** Document 5 is public
-(`user:*` on `shared`) and Mallory is banned from it, so she gets 403 while everyone
-else gets 200. This falls out of evaluating both sides of the exclusion rather than
-returning early on the branch that succeeded, and it is the behaviour every "publish"
-feature has needed since the first one.
-
-## Segregation of duties, in two halves
-
-`document.publish` is an intersection of two relations on the same document, so a
-compromised owner account cannot publish alone:
-
-```ts ts-fragment
-publish: permission.allOf('owner', 'approver').except('banned'),
-```
-
-What a permission *cannot* say is "and someone else must agree", because whether two
-holders are the same person is a property of a request. So the route asks the second
-question itself, using `listSubjects` on `document.approve` to find the countersigners
-and refusing if the caller is one of them. Both halves are in the scenario table.
-
-## Moving a document
-
-A move has to change two things that must agree — the `folder_id` column and the
-`parent` relation authorization walks — or you have an orphaned grant, or a document
-whose access nobody can explain:
+This is the whole safety argument for attribute-based access, stated plainly:
+**a request may fill in a condition's unbound parameters, so the only safe source
+of those parameters is your own database.** Read them off the user and
+organization rows — never off a query parameter, or `sameRegion` becomes a
+suggestion the client ignores at will:
 
 ```ts ts-skip
-let pending: Promise<unknown> | undefined;
-db.transaction((tx) => {
-  tx.update(documents).set({ folderId }).where(eq(documents.id, id)).run();
-  void drizzleStore(tx, tsbouncerTuples).delete({
-    kind: 'filter',
-    query: { resource: `document:${id}`, relation: 'parent' },
+// One middleware resolves identity and context together.
+async function identify(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const user = db.select().from(users).where(eq(users.id, req.header('x-user-id'))).get();
+  if (user === undefined) throw new HttpError(401, 'no such user');
+  const organization = db
+    .select()
+    .from(organizations)
+    .where(eq(organizations.id, req.header('x-org') ?? 'acme'))
+    .get();
+  if (organization === undefined) throw new HttpError(400, 'unknown organization');
+  req.caller = {
+    userId: user.id,
+    suspended: user.suspended,
+    organizationRegion: organization.region, // the tenant's region, not the user's
+    seatsUsed: organization.seatsUsed,
+  };
+  req.authz = authz;
+  next();
+}
+
+// Three keys, three conditions. A condition that asks for a key not in here
+// does not fall back to anything — it denies, and says why in `explain()`.
+function contextFor(caller: Caller) {
+  return {
+    callerRegion: caller.organizationRegion,
+    suspended: caller.suspended,
+    usedSeats: caller.seatsUsed,
+  };
+}
+
+async function requirePermission(
+  req: Request,
+  permission: Permission,
+  resource: string,
+): Promise<void> {
+  const allowed = await req.authz.can(`user:${req.caller.userId}`, permission, resource, {
+    context: contextFor(req.caller),
   });
-  pending = drizzleStore(tx, tsbouncerTuples).write({
-    tuples: [{ subject: `folder:${folderId}`, relation: 'parent', resource: `document:${id}` }],
+  if (!allowed) throw new HttpError(403, `${permission} on ${resource} is not yours`);
+}
+```
+
+`x-user-id` and `x-org` stand in for a session and a resolved host. In production
+neither is a client-chosen header.
+
+## Routes: the four shapes
+
+List, move, publish, explain. Each one exists to teach one thing:
+
+```ts ts-skip
+// What can this person see? Asked of the graph, with the truncation flag
+// returned even when false — a partial list must never look complete.
+app.get('/api/v1/me/documents', async (req, res) => {
+  const { resources, truncated } = await req.authz.listResources({
+    subject: `user:${req.caller.userId}`,
+    permission: 'document.read',
+    context: contextFor(req.caller),
   });
+  res.json({ documents: rowsById(idsOf(resources)), truncated });
 });
-await pending;
+
+// A move changes two things that must agree — the folder_id column and the
+// parent relation the walk follows — inside one transaction, or you have an
+// orphaned grant or a document whose access nobody can explain.
+app.post('/api/v1/documents/:id/move', async (req, res) => {
+  await requirePermission(req, 'document.manage', `document:${req.params.id}`);
+  db.transaction((tx) => {
+    tx.update(documents).set({ folderId: req.body.folderId }).run();
+    const store = drizzleStore(tx, tsbouncerTuples);
+    void store.delete({
+      kind: 'filter',
+      query: { resource: `document:${req.params.id}`, relation: 'parent' },
+    });
+    void store.write({
+      tuples: [
+        {
+          subject: `folder:${req.body.folderId}`,
+          relation: 'parent',
+          resource: `document:${req.params.id}`,
+        },
+      ],
+    });
+  });
+  res.json({ moved: true });
+});
+
+// Publishing needs the owner AND an approver — and the approver must be a
+// second, different person, which a permission cannot say. So the route asks
+// `listSubjects` on `document.approve` and refuses if the caller is the only
+// name on it, or on it at all as their own countersigner.
+app.post('/api/v1/documents/:id/publish', async (req, res) => {
+  await requirePermission(req, 'document.publish', `document:${req.params.id}`);
+  const approvers = await req.authz.listSubjects({
+    permission: 'document.approve',
+    resource: `document:${req.params.id}`,
+  });
+  if (approvers.members.includes(`user:${req.caller.userId}`)) {
+    throw new HttpError(403, 'cannot countersign your own publish');
+  }
+  res.json({ published: true });
+});
+
+// Who can see this, and why can't Mallory? The set stays symbolic and the
+// tree is computed from the same evaluation that refused — no logging needed.
+app.get('/api/v1/documents/:id/who', async (req, res) => {
+  res.json(await req.authz.listSubjects({ permission: 'document.read', resource: `document:${req.params.id}` }));
+});
+app.get('/api/v1/documents/:id/why', async (req, res) => {
+  res.json(
+    await req.authz.explain({
+      subject: `user:${req.caller.userId}`,
+      permission: 'document.read',
+      resource: `document:${req.params.id}`,
+    }),
+  );
+});
 ```
 
-The shape is not stylistic. `better-sqlite3` is synchronous and Drizzle *rejects* a
-transaction callback that returns a promise; on an async driver the same callback
-would commit before its work landed. The store detects which kind of client it holds
-by inspecting the client — not by probing a query builder, because builders expose
-`run`/`all`/`execute` on both kinds and a probe classifies every async driver as sync.
-On a client it does not recognise, it refuses to start rather than guessing.
+Two details worth copying. The move uses the store *inside* the application's
+transaction (`drizzleStore(tx, …)`), so the row and the edge commit together —
+and on an async driver the work must land before the callback returns, which the
+store enforces by inspecting the client rather than guessing. And a document
+under legal hold is readable but not writable via a 423 from row state, never a
+condition: a hold enforced by a value the caller supplies is not a hold.
 
-Two scenarios assert the transaction did its job: after the move the destination
-folder's owner can read the document, and the old path is gone.
+## Run it
 
-## Row state is not an edge
+```bash
+npx tsx src/server.ts &
+curl -s -H 'x-user-id: bob' -H 'x-org: acme' localhost:3000/api/v1/me/documents
+```
 
-Document 4 is under legal hold, which blocks edits. That is a column on the row, and
-the route enforces it with a 423 — deliberately *not* a condition. A condition's
-unbound parameters come from the request, so a hold enforced by one would be enforced
-by a value the caller supplies.
+```
+  rbac — roles attached to a project, so a document names nobody
+  ok    an editor reads it too                                     200
+  ok    and no grant at all is 403                                 403
 
-Which is the general rule: **edges are the model's, row state is the application's.**
-Keeping that line is what stops `documents.on_hold` from quietly becoming something
-anybody can talk their way past.
+  rebac — teams, folders, and access inherited down a tree
+  ok    a team member reads a document in a folder the team can see 200
+  ok    and one two levels down, by inheritance                    200
 
-## Two queries that refuse to invent answers
+  abac — three conditions, all of them failing closed
+  ok    a region-bound grant opens in the matching tenant          200
+  ok    a suspended account is refused even with a valid grant     403
 
-```ts ts-skip
-// src/app.ts — GET /api/v1/documents/5/who. Document 5 is public, so the answer is
-// { allOfTypes: ['user'], members: [], excluded: ['user:mallory'] } — symbolic, not
-// a roster of everyone in the database.
-const set = await authz.listSubjects({ permission: 'document.read', resource: 'document:5' });
+  exclusion — bans, wildcards, and publishing that needs two people
+  ok    but not by someone banned from it                          403
+  ok    holding both, with a second person countersigning, succeeds 200
+```
 
-// src/app.ts — GET /api/v1/documents/1/why. The whole decision tree, and how many
-// store reads it took.
-const result = await authz.explain({
-  subject: 'user:mallory',
-  permission: 'document.read',
+Fifty scenarios across identity, RBAC, ReBAC, ABAC, exclusion, queries,
+lifecycle, and errors — every one a live request, every one asserted.
+
+## Verify it
+
+The tour shows the system working; assertions pin the decisions. `src/verify.ts`
+with `npx tsx src/verify.ts` — silence is green:
+
+```ts
+// Inheritance: Bob reaches document 1 through his team, two edges down.
+assert.strictEqual(
+  await authz.can('user:bob', 'document.read', 'document:1', {
+    context: { callerRegion: 'eu', suspended: false, usedSeats: 4 },
+  }),
+  true,
+);
+
+// Exclusion beats everything it touches.
+assert.strictEqual(await authz.can('user:mallory', 'document.read', 'document:2'), false);
+assert.strictEqual(await authz.can('user:carol', 'document.read', 'document:5'), true);
+assert.strictEqual(await authz.can('user:mallory', 'document.read', 'document:5'), false);
+
+// Conditions fail closed on every axis.
+assert.strictEqual(
+  await authz.can('user:dave', 'document.read', 'document:1', {
+    context: { callerRegion: 'eu', suspended: false, usedSeats: 1 },
+  }),
+  true,
+);
+assert.strictEqual(
+  await authz.can('user:dave', 'document.read', 'document:1', {
+    context: { callerRegion: 'us', suspended: false, usedSeats: 1 },
+  }),
+  false,
+);
+assert.strictEqual(
+  await authz.can('user:erin', 'document.read', 'document:4', {
+    context: { callerRegion: 'eu', suspended: true, usedSeats: 1 },
+  }),
+  false,
+);
+assert.strictEqual(
+  await authz.can('user:dana', 'document.read', 'document:1', {
+    context: { callerRegion: 'eu', suspended: false, usedSeats: 4 },
+  }),
+  true,
+);
+
+// The dual key: Alice holds both, Bob holds neither half that matters.
+assert.strictEqual(await authz.can('user:alice', 'document.publish', 'document:1'), true);
+assert.strictEqual(await authz.can('user:bob', 'document.publish', 'document:1'), false);
+
+// The countersigner list is concrete, because membership here is finite.
+const approvers = await authz.listSubjects({
+  permission: 'document.approve',
   resource: 'document:1',
 });
+assert.ok(approvers.members.includes('user:alice'));
 ```
 
-A set that claims to be exhaustive and is not is the list-shaped version of a fail-open
-bug. And the `why` route deliberately does *not* require the permission it is
-explaining: the tree describes the caller's own request, and the moment you need it is
-when the answer was no.
-
-## The migration is hand-maintained, and tested
-
-`drizzle-kit` resolves the schema module with CommonJS semantics, and every package
-here is ESM-only with an `exports` map that has no `require` condition — so
-`drizzle-kit generate` fails with `ERR_PACKAGE_PATH_NOT_EXPORTED`. Adding a `require`
-condition would mean shipping a dual build, which this repository does not do.
-
-So `drizzle/0000_init.sql` is maintained by hand, and `test/schema.test.ts` is what
-holds it to the Drizzle schema: it fails if a column is missing, if a `NOT NULL` is
-missing, or if the unique index over the key columns is downgraded. That guard is not
-decorative — a column was added to the schema and not to the SQL during development,
-and the only symptom was a `SqliteError` on the first seed insert.
+Keep both. The transcript shows the system working end to end; the assertions
+survive refactors that a transcript would wave through.
 
 ## Limits, stated
 
-- `listResources` enumerates candidates and checks each, so its cost grows with the
-  number of resources of that type. The result carries `truncated` and the routes
-  return it, but a large deployment wants a narrower index.
-- `notSuspended` is a property of one grant, not a global account lock: a suspended
-  user still reaches a document that is public by wildcard. A hard lock means
-  conditioning every grant, or refusing the request in middleware before
-  authorization is asked. A test pins the current behaviour down.
-- `x-user-id` and `x-org` stand in for a session and a resolved host. In production
-  neither is a client-chosen header, and `src/http.ts` says so where it matters.
+- `listResources` enumerates candidates and checks each, so its cost grows with
+  the number of resources of that type. The result carries `truncated` and the
+  routes return it, but a large deployment wants a narrower index.
+- `notSuspended` is a property of one grant, not a global account lock: a
+  suspended user still reaches a document that is public by wildcard. A hard
+  lock means conditioning every grant, or refusing the request in middleware
+  before authorization is asked.
+- `x-user-id` and `x-org` stand in for a session and a resolved host. In
+  production neither is a client-chosen header.

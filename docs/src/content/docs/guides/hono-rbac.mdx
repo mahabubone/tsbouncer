@@ -8,27 +8,32 @@ kind: guide
 
 import Callout from '~/components/Callout.astro';
 
-The smallest application that is genuinely useful: [Hono](https://hono.dev) routes,
-role-based access control, and the entire access graph in a file you can read, diff
-and commit.
+You will build a small documents API with role-based access control: install the
+pieces, declare the model, seed the grants, wire three routes, run the server,
+and verify every decision twice — once with `curl`, once with assertions. About
+forty minutes, and you end with an API whose access list is a file you can read.
+
+## Install
 
 ```bash
-pnpm --filter @tsbouncer-examples/hono-rbac start
-pnpm --filter @tsbouncer-examples/hono-rbac test
+mkdir docs-api && cd docs-api
+npm init -y && npm pkg set type=module
+npm i hono @hono/node-server tsbouncer
+npm i -D tsx typescript @types/node
 ```
 
-Source: [`examples/hono-rbac`](https://github.com/tsbouncer/tsbouncer/tree/main/examples/hono-rbac) ·
-[model](https://github.com/tsbouncer/tsbouncer/blob/main/examples/hono-rbac/src/model.ts) ·
-[routes](https://github.com/tsbouncer/tsbouncer/blob/main/examples/hono-rbac/src/app.ts) ·
-[scenarios](https://github.com/tsbouncer/tsbouncer/blob/main/examples/hono-rbac/src/scenarios.ts)
+Node 22 or newer. Everything below assumes that directory.
 
-## One idea
+## The model — one idea
 
 **A document never names a person.** It names a *role*, and the role names its
 holders, so onboarding someone is one write rather than one per document.
+`src/model.ts`:
 
 ```ts setup
-import { createAuthz, defineModel, defineType, jsonStore, permission, relation } from 'tsbouncer';
+import { createAuthz, defineModel, defineType, permission, relation } from 'tsbouncer';
+import { jsonStore } from 'tsbouncer/json';
+import assert from 'node:assert/strict';
 ```
 
 ```ts
@@ -38,7 +43,6 @@ export const model = defineModel({
 
     role: defineType({
       relations: { holder: relation('user') },
-      permissions: { use: permission.or('holder') },
     }),
 
     document: defineType({
@@ -57,32 +61,62 @@ export const model = defineModel({
 });
 ```
 
-`relation('role', { through: 'holder' })` is what turns a role into "everyone who
-holds it". A userset edge must name a **relation**, never a permission — `holder` is
+`relation('role', { through: 'holder' })` turns a role into "everyone who holds
+it". A userset edge must name a **relation**, never a permission — `holder` is
 one, which is why this works.
 
-## The one thing to read twice
+`document.write` is open to editors. `document.manage` is not — it is the owner
+alone, and it is what changes *who has access*. A system where an editor can edit
+the access list is a system where a compromised editor account exfiltrates the
+document.
 
-An RBAC grant's subject is a userset, not the role:
+## Seed it and open the store
 
-```jsonc
-{ "subject": "role:acme:editor#holder", "relation": "editor", "resource": "document:1" }
+`src/seed.ts`. People go into roles, roles go onto documents — nothing names both
+a person and a document:
+
+```ts
+const authz = createAuthz({ model, store: jsonStore({ file: './authz.json' }) });
+
+await authz.write([
+  { subject: 'user:alice', relation: 'holder', resource: 'role:acme:admin' },
+  { subject: 'user:bob', relation: 'holder', resource: 'role:acme:editor' },
+  { subject: 'user:carol', relation: 'holder', resource: 'role:acme:viewer' },
+  { subject: 'user:alice', relation: 'owner', resource: 'document:1' },
+  { subject: 'role:acme:editor#holder', relation: 'editor', resource: 'document:1' },
+  { subject: 'role:acme:viewer#holder', relation: 'viewer', resource: 'document:2' },
+]);
 ```
 
-The `#holder` is the relation the model's edge walks, so the tuple reads "the holders
-of `acme:editor` are editors of this document", and a separate block of tuples says
-who that is. Write the bare role instead and validation rejects it:
+<Callout type="caution" title="The subject is a userset, not the role">
+`role:acme:editor#holder`, not `role:acme:editor`. The model's edge walks the
+`holder` relation, so the tuple has to name the userset. The bare role is
+rejected at write time, here at boot rather than as a 403 nobody can explain:
 
 ```
 relation "editor" on "document" does not accept a "role" subject
 ```
+</Callout>
 
-It is the most common first mistake with the model, and it is caught at write time
-rather than becoming a 403 nobody can explain.
+The store needs one line of explanation: `jsonStore` reads the file while
+constructing and re-writes it atomically after every mutation, so by the time an
+`await authz.write(...)` resolves the data is on disk. A missing file is an empty
+store — commit `authz.json` and a fresh clone has the same access graph.
 
-## Identity, and the 401/403 split
+## Who is calling: 401 versus 403
+
+`src/auth.ts`. A real app reads a session or a verified token; either way it ends
+the same way — one string in a context variable. Authorization starts from that
+string and nothing else:
 
 ```ts ts-skip
+import type { Context, MiddlewareHandler } from 'hono';
+import type { Authz } from 'tsbouncer';
+
+interface Env {
+  readonly Variables: { readonly authz: Authz; readonly subject: string | undefined };
+}
+
 export function identify(authz: Authz): MiddlewareHandler<Env> {
   return async (c, next) => {
     c.set('authz', authz);
@@ -91,54 +125,50 @@ export function identify(authz: Authz): MiddlewareHandler<Env> {
     await next();
   };
 }
+
+// The caller's reference, or a 401. Anonymous is 401;
+// authenticated-but-refused is 403, and conflating them tells a user
+// to log in when logging in will not help.
+export function caller(c: Context<Env>): string {
+  const subject = c.get('subject');
+  if (subject === undefined) throw new HttpError(401, 'provide an x-user-id header');
+  return subject;
+}
+
+export async function requirePermission(
+  c: Context<Env>,
+  permission: 'document.read' | 'document.write' | 'document.manage',
+  resource: string,
+): Promise<void> {
+  const allowed = await c.get('authz').can(caller(c), permission, resource);
+  if (!allowed) throw new HttpError(403, `${permission} on ${resource} is not yours`);
+}
 ```
 
-A real app reads a session or a verified token; either way it ends the same way — one
-string in a context variable. Authorization starts from that string and nothing else.
-The library has no opinion about how you authenticated, and deliberately no way to be
-told.
+(`HttpError` is a three-line class carrying a status — nothing library-specific.)
 
-`src/auth.ts` keeps the distinction that matters: anonymous is **401**, authenticated
-but refused is **403**. Conflating them tells a user to log in when logging in will not
-help.
+## Routes: authorize before you look
 
-## The ordering rule
-
-Every route in `src/app.ts` does the same three things in the same order:
+`src/app.ts`. Every route does the same three things in the same order: who is
+calling (401 if nobody), are they allowed (403 if not), and only then does the
+row get looked up:
 
 ```ts ts-skip
+// GET /api/documents/:id — a caller who may not read learns nothing,
+// whether or not the document exists.
 app.get('/api/documents/:id', async (c) => {
   const id = c.req.param('id');
   await requirePermission(c, 'document.read', `document:${id}`);
   const document = documents.find(id);
-  if (document === undefined) throw new HttpError(404, 'not_found', `no document ${id}`);
+  if (document === undefined) throw new HttpError(404, `no document ${id}`);
   return c.json(document);
 });
-```
 
-**Authorize before the row lookup.** A caller who may not read a document gets 403
-whether or not it exists, so the API cannot be used to probe for other people's ids.
-Inverting those two lines is a free existence oracle, and it is the most common way a
-hand-written check leaks.
-
-The price is that a 404 only happens for someone who was allowed to ask — which in
-practice means "the grant outlived the row". The fixture has one of those on purpose
-(`document:9` has an owner grant and no row), and two scenarios assert the pair.
-
-## Two permissions, not one
-
-`document.write` is open to editors. `document.manage` is not — it is the owner alone,
-and it is what changes *who has access*. A system where an editor can edit the access
-list is a system where a compromised editor account exfiltrates the document.
-
-## The list endpoint
-
-```ts ts-skip
-// src/app.ts — a reverse walk of the graph rather than a WHERE clause over rows.
+// GET /api/documents — what can this person read? Asked of the graph,
+// not of a WHERE clause, so it stays correct for rules added next week.
 app.get('/api/documents', async (c) => {
-  const subject = caller(c);
   const { resources, truncated } = await authz.listResources({
-    subject,
+    subject: caller(c),
     permission: 'document.read',
   });
   const ids = resources.map((reference) => reference.slice('document:'.length));
@@ -146,33 +176,107 @@ app.get('/api/documents', async (c) => {
 });
 ```
 
-A reverse walk of the graph rather than a `WHERE` clause over the rows, so the answer
-is correct for every rule the model declares — including one added next week that
-nobody remembers to write a query for.
+**Authorize before the row lookup.** Inverting those two lines hands out a free
+existence oracle: 403 for "not yours", 404 for "not there", and an attacker
+subtracts one from the other. The price is that a 404 only happens for someone
+who was allowed to ask — in practice "the grant outlived the row".
 
-`truncated` is part of the contract, not a footnote. The walk is budgeted, a budget
-that runs out mid-enumeration produces a partial list, and a bare array could not tell
-you that. The route returns the flag even when it is `false`.
+Grants are routes too — creating access is a write through the model, guarded by
+`manage`:
 
-## Storage, in one line
+```ts ts-skip
+// POST /api/documents/:id/roles { role: 'acme:editor' } — hand a document to a role.
+app.post('/api/documents/:id/roles', async (c) => {
+  const id = c.req.param('id');
+  await requirePermission(c, 'document.manage', `document:${id}`);
+  const body = (await c.req.json().catch(() => ({}))) as { role?: unknown };
+  if (body.role !== 'acme:editor' && body.role !== 'acme:viewer') {
+    throw new HttpError(400, `unknown role ${String(body.role)}`);
+  }
+  const relation = body.role === 'acme:editor' ? 'editor' : 'viewer';
+  await authz.grant({
+    subject: `role:${body.role}#holder`,
+    relation,
+    resource: `document:${id}`,
+  });
+  return c.json({ granted: true }, 201);
+});
 
-```ts
-const authz = createAuthz({ model, store: jsonStore({ file: 'authz.json' }) });
+// GET /api/documents/:id/why — the whole decision tree, for the question
+// support actually asks. It needs no debugging and no logging, because the
+// answer is computed from the same evaluation that produced the refusal.
+app.get('/api/documents/:id/why', async (c) => {
+  const id = c.req.param('id');
+  await requirePermission(c, 'document.read', `document:${id}`);
+  return c.json(
+    await authz.explain({
+      subject: caller(c),
+      permission: 'document.read',
+      resource: `document:${id}`,
+    }),
+  );
+});
 ```
 
-Reads happen while the store is constructed; writes are on disk by the time the
-promise resolves, written to a temp file and renamed into place, so a crash cannot
-leave a half-written access list. A missing file is an empty store, which is what
-makes a checked-in fixture work — the *directory* has to exist, because this store
-creates a file, not a tree.
+`truncated` is part of the contract, not a footnote. The list walk is budgeted, a
+budget that runs out mid-enumeration produces a partial list, and a bare array
+could not tell you that — so the route returns the flag even when it is `false`.
 
-The tour prints the file at the end, because for this example the storage format is
-half the point.
+## Run it
+
+Boot the server (`serve` from `@hono/node-server`, port 3000), then talk to it:
+
+```bash
+npx tsx src/server.ts &
+BOB=" -H 'x-user-id: bob'"; CAROL=" -H 'x-user-id: carol'"
+curl -s$BOB localhost:3000/api/documents/1 | head -c 60; echo
+curl -s -o /dev/null -w '%{http_code}\n' -X PATCH$CAROL localhost:3000/api/documents/1
+curl -s -o /dev/null -w '%{http_code}\n' localhost:3000/api/documents/1
+```
+
+```
+{"id":"1","title":"Onboarding","body":"Day one is paperwork..."}
+403
+401
+```
+
+Bob reads what his role grants him. Carol — a viewer — may not write. And nobody
+at all is 401, not 403: anonymous callers are unauthenticated, not forbidden.
+
+## Verify it
+
+`curl` proves the server answers; assertions prove the *decisions* hold.
+`src/verify.ts`, run with `npx tsx src/verify.ts` — silence is green:
+
+```ts
+// Ownership, roles, and the line between them.
+assert.strictEqual(await authz.can('user:bob', 'document.read', 'document:1'), true);
+assert.strictEqual(await authz.can('user:bob', 'document.write', 'document:1'), true);
+assert.strictEqual(await authz.can('user:carol', 'document.write', 'document:1'), false);
+assert.strictEqual(await authz.can('user:bob', 'document.manage', 'document:1'), false);
+assert.strictEqual(await authz.can('user:alice', 'document.manage', 'document:1'), true);
+
+// The list agrees with the checks, and says whether it is complete.
+const listed = await authz.listResources({ subject: 'user:bob', permission: 'document.read' });
+assert.ok(listed.resources.includes('document:1'));
+assert.strictEqual(listed.truncated, false);
+
+// A refusal explains itself.
+const denied = await authz.explain({
+  subject: 'user:carol',
+  permission: 'document.write',
+  resource: 'document:1',
+});
+assert.strictEqual(denied.allowed, false);
+```
+
+Keep both. The transcript shows the system working end to end; the assertions pin
+the decisions so a later model edit that silently moves them fails loudly instead
+of shipping.
 
 ## When to stop reading
 
 There is no folder tree, no teams, no inheritance, no attributes and no conditions
 here. That is deliberate — it is the shape to internalise first. When the
-requirements outgrow it, the
-[real-world API](/guides/express-drizzle) is the same library over a real database with
-ReBAC and ABAC on one model.
+requirements outgrow it, [the real-world API](./express-drizzle) is the same
+library over a real database, with ReBAC and ABAC on one accumulated model.
