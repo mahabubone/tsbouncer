@@ -1,19 +1,19 @@
-import type { KeymanStore, Tuple } from '@tsbouncer/core';
+import type { Tuple, TupleStore } from '@tsbouncer/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 export interface ConformanceOptions {
   /** Used in the suite name. */
   readonly name: string;
   /** Produce a fresh, empty store for each test. */
-  readonly create: () => KeymanStore | Promise<KeymanStore>;
+  readonly create: () => TupleStore | Promise<TupleStore>;
   /** Release any resources held by the store. */
-  readonly teardown?: (store: KeymanStore) => void | Promise<void>;
+  readonly teardown?: (store: TupleStore) => void | Promise<void>;
   /**
    * Stores are not required to support every capability. Any capability listed
    * here is skipped. Capabilities that are *not* listed are asserted to work, so
    * do not silence a failure you have not understood.
    */
-  readonly skip?: readonly (keyof KeymanStore['capabilities'])[];
+  readonly skip?: readonly (keyof TupleStore['capabilities'])[];
 }
 
 const ALICE: Tuple = {
@@ -50,19 +50,19 @@ function ids(tuples: readonly Tuple[]): string[] {
  * `PLAN.md` and nothing else. It does not assert ordering, error messages, or
  * error types — those are implementation details, and pinning them would make
  * the suite hostile to legitimate stores. If a store cannot pass this, it is
- * not a `KeymanStore`.
+ * not a `TupleStore`.
  */
 export function storeConformance(options: ConformanceOptions): void {
   const skip = new Set(options.skip ?? []);
 
   describe(`store conformance: ${options.name}`, () => {
-    let store: KeymanStore;
+    let store: TupleStore;
 
     const seed = async (tuples: readonly Tuple[] = SEED): Promise<void> => {
       await store.write({ tuples, mode: 'upsert' });
     };
 
-    const read = async (query: Parameters<KeymanStore['read']>[0] = {}) => {
+    const read = async (query: Parameters<TupleStore['read']>[0] = {}) => {
       const page = await store.read(query);
       return page.items;
     };
@@ -317,4 +317,13 @@ export function storeConformance(options: ConformanceOptions): void {
   });
 }
 
+export type { GoldenCheck, GoldenOutcome } from './golden.js';
+export {
+  assertGolden,
+  GOLDEN_EXPECTED,
+  goldenChecks,
+  goldenModel,
+  goldenTuples,
+  runGolden,
+} from './golden.js';
 export { SEED as CONFORMANCE_SEED };

@@ -1,7 +1,7 @@
 {
   "name": "@tsbouncer/memory",
   "version": "0.0.0",
-  "description": "Process-local KeymanStore. Ideal for isolated tests.",
+  "description": "Process-local TupleStore. Ideal for isolated tests.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,

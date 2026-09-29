@@ -1,6 +1,6 @@
 # @tsbouncer/prisma
 
-A [`KeymanStore`](../../core) over an application-owned Prisma client.
+A [`TupleStore`](../../core) over an application-owned Prisma client.
 
 **Requires Prisma 7 or later.** Prisma 7 moved `datasource.url` out of the schema
 file and requires a driver adapter on the client, and the `latest` tag of the

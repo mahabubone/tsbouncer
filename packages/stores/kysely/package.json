@@ -1,7 +1,7 @@
 {
   "name": "@tsbouncer/kysely",
   "version": "0.0.0",
-  "description": "KeymanStore over an application-owned Kysely instance.",
+  "description": "TupleStore over an application-owned Kysely instance.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,

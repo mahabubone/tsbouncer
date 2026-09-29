@@ -1,6 +1,6 @@
 # @tsbouncer/drizzle
 
-A [`KeymanStore`](../../core) over an application-owned [Drizzle](https://orm.drizzle.team) instance.
+A [`TupleStore`](../../core) over an application-owned [Drizzle](https://orm.drizzle.team) instance.
 
 Pass the same `db` your app already uses, plus the exact table object you declared
 in your schema. Drizzle builds SQL from a table's column metadata, so the store and

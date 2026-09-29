@@ -112,9 +112,6 @@ function walk(node: ExplainNode, depth: number): string {
   for (const tuple of node.tuples) {
     lines.push(`${pad}${INDENT}${tuple.subject}#${tuple.relation}@${tuple.resource}`);
   }
-  if (node.result === false && node.tuples.length === 0 && node.query !== undefined) {
-    lines.push(`${pad}${INDENT}no matching tuples`);
-  }
 
   for (const child of node.children) lines.push(walk(child, depth + 1));
   return lines.join('\n');

@@ -95,6 +95,7 @@ export {
 } from './refs.js';
 export type {
   ModelShape,
+  ModelShapeOf,
   ObjectRefOf,
   PermissionOf,
   SubjectRefOf,
@@ -104,11 +105,11 @@ export type {
 export type {
   DeleteInput,
   FilterValue,
-  KeymanStore,
-  KeymanStoreCapabilities,
   Page,
   ReadTupleQuery,
   Tuple,
+  TupleStore,
+  TupleStoreCapabilities,
   WriteInput,
   WriteMode,
 } from './store.js';

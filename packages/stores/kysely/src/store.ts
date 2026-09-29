@@ -1,10 +1,10 @@
 import type {
   DeleteInput,
-  KeymanStore,
-  KeymanStoreCapabilities,
   Page,
   ReadTupleQuery,
   Tuple,
+  TupleStore,
+  TupleStoreCapabilities,
   WriteInput,
 } from '@tsbouncer/core';
 import { formatRef, parseRef, StoreError } from '@tsbouncer/core';
@@ -35,7 +35,7 @@ export interface KyselyStoreOptions {
 
 const DEFAULT_BATCH = 500;
 
-const CAPABILITIES: KeymanStoreCapabilities = Object.freeze({
+const CAPABILITIES: TupleStoreCapabilities = Object.freeze({
   atomicWrite: true,
   persistent: true,
   atomicReplace: true,
@@ -54,7 +54,7 @@ const inList = (column: string, values: readonly unknown[]): Where =>
   values.length === 1 ? eq(column, values[0]) : (eb) => eb(column, 'in', [...values]);
 
 /**
- * A `KeymanStore` over an application-owned Kysely instance.
+ * A `TupleStore` over an application-owned Kysely instance.
  *
  * Pass the same Kysely instance your app already uses. To enlist a write in an
  * existing transaction, pass that transaction handle instead — the store has no
@@ -63,7 +63,7 @@ const inList = (column: string, values: readonly unknown[]): Where =>
 export function kyselyStore<DB>(
   db: Kysely<DB>,
   options: KyselyStoreOptions = {},
-): KeymanStore {
+): TupleStore {
   const table = options.table ?? TABLE;
   const batchSize = options.batchSize ?? DEFAULT_BATCH;
   const k = db as unknown as QueryBuilder;

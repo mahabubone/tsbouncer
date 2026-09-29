@@ -3,11 +3,11 @@ import { rename, unlink, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import type {
   DeleteInput,
-  KeymanStore,
-  KeymanStoreCapabilities,
   Page,
   ReadTupleQuery,
   Tuple,
+  TupleStore,
+  TupleStoreCapabilities,
   WriteInput,
 } from '@tsbouncer/core';
 import { matchesQuery, StoreError, tupleKey } from '@tsbouncer/core';
@@ -15,7 +15,7 @@ import { matchesQuery, StoreError, tupleKey } from '@tsbouncer/core';
 export type { Document } from './format.js';
 export { FORMAT_VERSION } from './format.js';
 
-export interface JsonStore extends KeymanStore {
+export interface JsonStore extends TupleStore {
   /** The resolved file this store persists to. */
   readonly file: string;
   /** Every tuple currently held, in insertion order. */
@@ -24,7 +24,7 @@ export interface JsonStore extends KeymanStore {
   reload(): Promise<void>;
 }
 
-const CAPABILITIES: KeymanStoreCapabilities = Object.freeze({
+const CAPABILITIES: TupleStoreCapabilities = Object.freeze({
   atomicWrite: true,
   persistent: true,
   atomicReplace: true,
@@ -50,7 +50,7 @@ export interface JsonStoreOptions {
 let tempCounter = 0;
 
 /**
- * A `KeymanStore` over a single JSON file.
+ * A `TupleStore` over a single JSON file.
  *
  * The whole state is held in memory and the file is rewritten on every mutation,
  * which is the point: the file stays a human-readable, git-diffable, portable

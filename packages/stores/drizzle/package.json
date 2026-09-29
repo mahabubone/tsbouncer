@@ -1,7 +1,7 @@
 {
   "name": "@tsbouncer/drizzle",
   "version": "0.0.0",
-  "description": "KeymanStore over an application-owned Drizzle instance.",
+  "description": "TupleStore over an application-owned Drizzle instance.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,

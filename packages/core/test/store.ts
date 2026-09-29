@@ -1,9 +1,9 @@
 import type {
   DeleteInput,
-  KeymanStore,
   Page,
   ReadTupleQuery,
   Tuple,
+  TupleStore,
 } from '../src/index.js';
 import { matchesQuery, tupleKey } from '../src/index.js';
 
@@ -20,7 +20,7 @@ import { matchesQuery, tupleKey } from '../src/index.js';
  * is verified against the same `storeConformance` suite, so a divergence here
  * shows up as a conformance failure rather than a silent engine bug.
  */
-export function testStore(seed: readonly Tuple[] = []): KeymanStore {
+export function testStore(seed: readonly Tuple[] = []): TupleStore {
   const rows = new Map<string, Tuple>();
   for (const tuple of seed) rows.set(tupleKey(tuple), Object.freeze({ ...tuple }));
 

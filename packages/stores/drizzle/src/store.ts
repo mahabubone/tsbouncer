@@ -1,10 +1,10 @@
 import type {
   DeleteInput,
-  KeymanStore,
-  KeymanStoreCapabilities,
   Page,
   ReadTupleQuery,
   Tuple,
+  TupleStore,
+  TupleStoreCapabilities,
   WriteInput,
 } from '@tsbouncer/core';
 import { formatRef, parseRef, StoreError } from '@tsbouncer/core';
@@ -116,7 +116,7 @@ function resolveDriverKind(db: DrizzleDb, override: DriverKind | undefined): Dri
   );
 }
 
-const CAPABILITIES: KeymanStoreCapabilities = Object.freeze({
+const CAPABILITIES: TupleStoreCapabilities = Object.freeze({
   atomicWrite: true,
   persistent: true,
   atomicReplace: true,
@@ -126,7 +126,7 @@ const CAPABILITIES: KeymanStoreCapabilities = Object.freeze({
 });
 
 /**
- * A `KeymanStore` over an application-owned Drizzle instance.
+ * A `TupleStore` over an application-owned Drizzle instance.
  *
  * Pass the same `db` your app already uses, plus the exact table object you
  * declared in your schema — Drizzle builds SQL from a table's column metadata,
@@ -139,7 +139,7 @@ export function drizzleStore(
   db: DrizzleDb,
   table: AnyTsbouncerTable,
   options: DrizzleStoreOptions = {},
-): KeymanStore {
+): TupleStore {
   const t = table as DrizzleTable;
   const batchSize = options.batchSize ?? DEFAULT_BATCH;
 

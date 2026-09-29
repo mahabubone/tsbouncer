@@ -10,7 +10,7 @@ import {
   type RefPosition,
   WILDCARD,
 } from './refs.js';
-import type { KeymanStore, ReadTupleQuery, Tuple } from './store.js';
+import type { ReadTupleQuery, Tuple, TupleStore } from './store.js';
 import {
   difference,
   emptySet,
@@ -29,7 +29,7 @@ export interface ExpandResult {
 
 interface QueryCtx {
   readonly model: Model;
-  readonly store: KeymanStore;
+  readonly store: TupleStore;
   readonly context: ConditionContext | undefined;
   readonly budget: Budget;
   truncated: boolean;
@@ -37,7 +37,7 @@ interface QueryCtx {
 
 function createCtx(
   model: Model,
-  store: KeymanStore,
+  store: TupleStore,
   context: ConditionContext | undefined,
   limits: EvaluationLimits,
 ): QueryCtx {
@@ -78,7 +78,7 @@ function charge(ctx: QueryCtx, depth: number): boolean {
  */
 export async function expandSubjects(
   model: Model,
-  store: KeymanStore,
+  store: TupleStore,
   subject: string,
   limits: EvaluationLimits,
 ): Promise<ExpandResult> {
@@ -163,7 +163,7 @@ export interface ListResourcesInput {
  */
 export async function listResources(
   model: Model,
-  store: KeymanStore,
+  store: TupleStore,
   input: ListResourcesInput,
   limits: EvaluationLimits,
 ): Promise<ResourceList> {
@@ -479,7 +479,7 @@ export interface ListSubjectsInput {
  */
 export async function listSubjects(
   model: Model,
-  store: KeymanStore,
+  store: TupleStore,
   input: ListSubjectsInput,
   limits: EvaluationLimits,
 ): Promise<SubjectSet> {
@@ -502,10 +502,18 @@ async function expand(
   switch (node.kind) {
     case 'direct': {
       const found = await expandDirect(ctx, node, resource, member);
-      // A wildcard edge is *every* subject of the type, not a list of them — and
-      // the model can declare that edge on its own, with no tuple required. A
-      // stored `user:*` tuple does the same for a relation not declared wildcard.
-      if (node.wildcard || found.wildcard) {
+      // A stored `user:*` tuple means *every* subject of the type, not a list of
+      // them, so the answer stays symbolic.
+      //
+      // `node.wildcard` — the edge being *declared* wildcard — deliberately does
+      // **not** contribute here. It says the relation accepts a `user:*` subject;
+      // it does not say every user is already a member. Including it made this
+      // path disagree with `can` on the ordinary ban-list model: with
+      // `banned: relation('user').or(wildcard('user'))` and no `banned` tuple,
+      // `can` said allowed and `listSubjects` said nobody, so an access list
+      // disagreed with the decisions it was supposed to summarise. A ban relation
+      // is the common case, and it is how a "banned" row is allowed to be absent.
+      if (found.wildcard) {
         return unionAll([setOfType(node.type), found.value]);
       }
       return found.value;

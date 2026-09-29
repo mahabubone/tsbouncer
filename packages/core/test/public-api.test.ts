@@ -1,7 +1,161 @@
 // biome-ignore-all lint/performance/noDynamicNamespaceImportAccess: enumerating the export surface by name is the point of this test
 import { describe, expect, it } from 'vitest';
+import type {
+  AuthorizationErrorCode,
+  AuthorizationErrorOptions,
+  Authz,
+  CheckOptions,
+  CheckRequest,
+  Child,
+  ComputedNode,
+  ConditionContext,
+  ConditionDef,
+  ConditionDenied,
+  ConditionOptions,
+  ConditionOutcome,
+  ConditionPredicate,
+  CreateAuthzOptions,
+  Decision,
+  DeleteInput,
+  DirectNode,
+  EvaluationLimits,
+  EvaluationOutcome,
+  EvaluationRequest,
+  ExclusionNode,
+  ExpandResult,
+  ExplainNode,
+  ExplainOp,
+  ExplainResult,
+  FilterValue,
+  GrantInput,
+  IntersectionNode,
+  LimitKind,
+  ListResourcesInput,
+  ListResourcesQuery,
+  ListSubjectsInput,
+  ListSubjectsQuery,
+  Model,
+  ModelConfig,
+  ModelShape,
+  ModelShapeOf,
+  ObjectRefOf,
+  Page,
+  ParamType,
+  ParsedRef,
+  PermissionOf,
+  ReadTupleQuery,
+  RefPosition,
+  ResourceList,
+  SetExpression,
+  SetNode,
+  SubjectRefOf,
+  SubjectSet,
+  TtuNode,
+  Tuple,
+  TupleStore,
+  TupleStoreCapabilities,
+  TypeConfig,
+  TypeDefinition,
+  TypeNames,
+  TypeShape,
+  UnionNode,
+  UsersetNode,
+  WriteInput,
+  WriteMode,
+} from '../src/index.js';
 import * as api from '../src/index.js';
 import { testStore } from './store.js';
+
+/**
+ * Every type-only export, named.
+ *
+ * The assertions elsewhere in this file are runtime lookups, which cannot see a
+ * type erased at build time — deleting `PermissionOf` from `index.ts` left every
+ * test here green, which is the worst failure mode a public API can have: a
+ * silent removal nobody notices until a consumer's build breaks. The type-level
+ * derivations were broken exactly this way for the whole life of the project.
+ *
+ * This map is the guard. A missing or renamed type export is a build failure
+ * here rather than a release note. Adding a type means adding a line, and
+ * removing one has to be a deliberate edit to this file.
+ */
+type Shape = {
+  types: {
+    user: { relations: { member: SetExpression }; permissions: { read: SetNode } };
+  };
+};
+
+/**
+ * Types that need arguments are instantiated with a concrete shape, which is also
+ * the only way to prove their constraint is actually satisfiable.
+ */
+type ExportedTypes = {
+  AuthorizationErrorCode: AuthorizationErrorCode;
+  AuthorizationErrorOptions: AuthorizationErrorOptions;
+  Authz: Authz;
+  CheckOptions: CheckOptions;
+  CheckRequest: CheckRequest;
+  Child: Child;
+  ComputedNode: ComputedNode;
+  ConditionContext: ConditionContext;
+  ConditionDef: ConditionDef;
+  ConditionDenied: ConditionDenied;
+  ConditionOptions: ConditionOptions;
+  ConditionOutcome: ConditionOutcome;
+  ConditionPredicate: ConditionPredicate;
+  CreateAuthzOptions: CreateAuthzOptions;
+  Decision: Decision;
+  DeleteInput: DeleteInput;
+  DirectNode: DirectNode;
+  EvaluationLimits: EvaluationLimits;
+  EvaluationOutcome: EvaluationOutcome;
+  EvaluationRequest: EvaluationRequest;
+  ExclusionNode: ExclusionNode;
+  ExpandResult: ExpandResult;
+  ExplainNode: ExplainNode;
+  ExplainOp: ExplainOp;
+  ExplainResult: ExplainResult;
+  FilterValue: FilterValue;
+  GrantInput: GrantInput;
+  IntersectionNode: IntersectionNode;
+  LimitKind: LimitKind;
+  ListResourcesInput: ListResourcesInput;
+  ListResourcesQuery: ListResourcesQuery;
+  ListSubjectsInput: ListSubjectsInput;
+  ListSubjectsQuery: ListSubjectsQuery;
+  Model: Model;
+  ModelConfig: ModelConfig;
+  ModelShape: ModelShape;
+  ModelShapeOf: ModelShapeOf<Model<Shape>>;
+  ObjectRefOf: ObjectRefOf<Shape>;
+  Page: Page<Tuple>;
+  ParamType: ParamType;
+  ParsedRef: ParsedRef;
+  PermissionOf: PermissionOf<Shape>;
+  ReadTupleQuery: ReadTupleQuery;
+  RefPosition: RefPosition;
+  ResourceList: ResourceList;
+  SetExpression: SetExpression;
+  SetNode: SetNode;
+  SubjectRefOf: SubjectRefOf<Shape>;
+  SubjectSet: SubjectSet;
+  TtuNode: TtuNode;
+  Tuple: Tuple;
+  TupleStore: TupleStore;
+  TupleStoreCapabilities: TupleStoreCapabilities;
+  TypeConfig: TypeConfig;
+  TypeDefinition: TypeDefinition;
+  TypeNames: TypeNames<Shape>;
+  TypeShape: TypeShape;
+  UnionNode: UnionNode;
+  UsersetNode: UsersetNode;
+  WriteInput: WriteInput;
+  WriteMode: WriteMode;
+};
+
+/** Never constructed; it exists so the aliases above are resolved. */
+const exportedTypes: ExportedTypes | undefined = undefined;
+void exportedTypes;
 
 /**
  * The barrel is part of the measured surface, so it gets a real test rather

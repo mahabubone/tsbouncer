@@ -1,22 +1,22 @@
 import type {
   DeleteInput,
-  KeymanStore,
-  KeymanStoreCapabilities,
   Page,
   ReadTupleQuery,
   Tuple,
+  TupleStore,
+  TupleStoreCapabilities,
   WriteInput,
 } from '@tsbouncer/core';
 import { matchesQuery, tupleKey } from '@tsbouncer/core';
 
-export interface MemoryStore extends KeymanStore {
+export interface MemoryStore extends TupleStore {
   /** Every tuple currently held, in insertion order. */
   snapshot(): readonly Tuple[];
   /** Number of tuples currently held. */
   size(): number;
 }
 
-const CAPABILITIES: KeymanStoreCapabilities = Object.freeze({
+const CAPABILITIES: TupleStoreCapabilities = Object.freeze({
   atomicWrite: true,
   persistent: false,
   atomicReplace: true,

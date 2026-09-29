@@ -10,11 +10,11 @@ import {
   type RefPosition,
   WILDCARD,
 } from './refs.js';
-import type { KeymanStore, ReadTupleQuery, Tuple } from './store.js';
+import type { ReadTupleQuery, Tuple, TupleStore } from './store.js';
 
 export interface EvaluationRequest {
   readonly model: Model;
-  readonly store: KeymanStore;
+  readonly store: TupleStore;
   readonly subject: ParsedRef;
   /** Relation or permission name on the resource's type. */
   readonly member: string;
@@ -31,7 +31,7 @@ export interface EvaluationOutcome {
 
 interface Ctx {
   readonly model: Model;
-  readonly store: KeymanStore;
+  readonly store: TupleStore;
   readonly subjectRef: string;
   readonly subjectType: string;
   readonly budget: Budget;

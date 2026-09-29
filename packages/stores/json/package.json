@@ -1,7 +1,7 @@
 {
   "name": "@tsbouncer/json",
   "version": "0.0.0",
-  "description": "A KeymanStore over a single human-readable JSON file. Local dev, fixtures, and small tools.",
+  "description": "A TupleStore over a single human-readable JSON file. Local dev, fixtures, and small tools.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,

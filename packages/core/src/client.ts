@@ -14,8 +14,8 @@ import { formatPermission, parsePermission, parseRef, WILDCARD } from './refs.js
 import {
   assertStoreShape,
   type DeleteInput,
-  type KeymanStore,
   type Tuple,
+  type TupleStore,
   type WriteMode,
 } from './store.js';
 import type { SubjectSet } from './subjectset.js';
@@ -23,7 +23,7 @@ import { validateTuples } from './write.js';
 
 export interface CreateAuthzOptions {
   readonly model: Model;
-  readonly store: KeymanStore;
+  readonly store: TupleStore;
   /** Per-request evaluation budget. */
   readonly limits?: Partial<EvaluationLimits> | undefined;
   /** Validate every tuple against the model before writing. Default true. */
@@ -72,9 +72,20 @@ export interface GrantInput {
 
 export interface Authz {
   readonly model: Model;
-  readonly store: KeymanStore;
+  readonly store: TupleStore;
 
-  can(subject: string, permission: string, resource: string): Promise<boolean>;
+  /**
+   * The boolean form. `options` exists so a condition can be supplied — without
+   * it there is no way to ask this question about a conditional permission, and
+   * a JavaScript caller who passed a fourth argument anyway had it silently
+   * ignored, producing a deny that looked like a policy decision.
+   */
+  can(
+    subject: string,
+    permission: string,
+    resource: string,
+    options?: CheckOptions,
+  ): Promise<boolean>;
   check(request: CheckRequest, options?: CheckOptions): Promise<Decision>;
   assert(request: CheckRequest, options?: CheckOptions): Promise<void>;
   explain(request: CheckRequest, options?: CheckOptions): Promise<ExplainResult>;
@@ -95,7 +106,7 @@ export interface Authz {
   delete(input: DeleteInput): Promise<void>;
 
   /** A client bound to another store — typically a transaction handle. */
-  withStore(store: KeymanStore): Authz;
+  withStore(store: TupleStore): Authz;
 
   types(): string[];
   relations(type: string): string[];
@@ -122,10 +133,14 @@ export function createAuthz(options: CreateAuthzOptions): Authz {
     model,
     store,
 
-    can(subject, permission, resource) {
-      return decide(model, store, limits, { subject, permission, resource }).then(
-        (d) => d.allowed,
-      );
+    can(subject, permission, resource, checkOptions) {
+      return decide(
+        model,
+        store,
+        limits,
+        { subject, permission, resource },
+        checkOptions,
+      ).then((d) => d.allowed);
     },
 
     async check(request, checkOptions) {
@@ -177,6 +192,10 @@ export function createAuthz(options: CreateAuthzOptions): Authz {
           subject: request.subject,
           member,
           resourceType: type,
+          // Forwarded, because the query type promises it. Dropping it made every
+          // conditionally-granted resource invisible here while `check` allowed
+          // it — a list that silently omits what the user can actually open.
+          context: request.context,
         },
         limits,
       );
@@ -192,6 +211,7 @@ export function createAuthz(options: CreateAuthzOptions): Authz {
           member,
           resource: request.resource,
           resourceType: type,
+          context: request.context,
         },
         limits,
       );
@@ -331,7 +351,7 @@ function splitPermission(
 
 async function decide(
   model: Model,
-  store: KeymanStore,
+  store: TupleStore,
   limits: EvaluationLimits,
   request: CheckRequest,
   options?: CheckOptions,

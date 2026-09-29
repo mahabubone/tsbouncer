@@ -247,13 +247,52 @@ describe('symbolic answers from listSubjects', () => {
         }),
       },
     });
-    const authz = createAuthz({ model: many, store: testStore() });
+    // A symbolic answer needs a `user:*` tuple. Declaring the edge wildcard says
+    // the relation *accepts* one; it does not put every subject in the set. An
+    // earlier version of this test asserted `['team', 'user']` with no tuples at
+    // all, which meant `listSubjects` claimed everyone had access while `can`
+    // denied every subject.
+    const authz = createAuthz({
+      model: many,
+      store: testStore([
+        { subject: 'user:*', relation: 'users', resource: 'doc:1' },
+        { subject: 'team:*', relation: 'groups', resource: 'doc:1' },
+      ]),
+    });
     const result = await authz.listSubjects({
       permission: 'doc.read',
       resource: 'doc:1',
     });
     expect(result.allOfTypes).toEqual(['team', 'user']);
     expect(isExhaustive(result)).toBe(false);
+    expect(await authz.can('user:anyone', 'doc.read', 'doc:1')).toBe(true);
+  });
+
+  it('reports nobody when a declared-wildcard relation has no tuple', async () => {
+    // The other half of the same invariant: declaring `banned` wildcard must not
+    // make `listSubjects` subtract everyone, or it contradicts `can`.
+    const authz = createAuthz({
+      model: defineModel({
+        types: {
+          user: defineType({}),
+          doc: defineType({
+            relations: {
+              owner: relation(['user']),
+              banned: relation('user').or(wildcard('user')),
+            },
+            permissions: { write: permission.allOf('owner').except('banned') },
+          }),
+        },
+      }),
+      store: testStore([{ subject: 'user:alice', relation: 'owner', resource: 'doc:1' }]),
+    });
+
+    expect(await authz.can('user:alice', 'doc.write', 'doc:1')).toBe(true);
+    const result = await authz.listSubjects({
+      permission: 'doc.write',
+      resource: 'doc:1',
+    });
+    expect(result.members).toEqual(['user:alice']);
   });
 
   it('keeps a symbolic set after a symbolic subtraction', async () => {

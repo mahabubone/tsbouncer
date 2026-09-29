@@ -321,9 +321,15 @@ describe('listSubjects', () => {
   });
 
   it('subtracts a wildcard except side from everyone', async () => {
-    // `write` excludes `banned`, which is declared wildcard — so every user is
-    // banned and the honest answer is nobody.
-    const result = await setup([T('user:alice', 'owner', 'document:1')]).listSubjects({
+    // Here `banned` really does hold a `user:*` tuple, so every user is banned
+    // and the honest answer is nobody. The contrast with the next test is the
+    // point: a *stored* wildcard subtracts everyone, a merely *declared* one
+    // does not.
+    const result = await setup([
+      T('user:alice', 'owner', 'document:1'),
+      T('user:alice', 'editor', 'document:1'),
+      T('user:*', 'banned', 'document:1'),
+    ]).listSubjects({
       permission: 'document.write',
       resource: 'document:1',
     });
@@ -331,13 +337,28 @@ describe('listSubjects', () => {
     expect(result.allOfTypes).toEqual([]);
   });
 
-  it('subtracts the except side', async () => {
+  it('subtracts the except side to an empty set', async () => {
+    // alice satisfies `owner` but not `editor`, so the intersection is already
+    // empty before the exclusion. The exclusion is asserted separately, below,
+    // with a base that is non-empty.
     const result = await setup([
       T('user:alice', 'owner', 'document:1'),
       T('user:alice', 'editor', 'document:1'),
       T('user:alice', 'banned', 'document:1'),
     ]).listSubjects({ permission: 'document.write', resource: 'document:1' });
     expect(result.members).toEqual([]);
+  });
+
+  it('keeps the base when the banned relation is empty', async () => {
+    // `banned` is declared wildcard in the fixture model, and has no tuple here.
+    // Declaring the edge says the relation accepts a `user:*` subject; it does not
+    // ban everyone. Reading it otherwise made `listSubjects` contradict `can`.
+    const result = await setup([
+      T('user:alice', 'owner', 'document:1'),
+      T('user:alice', 'editor', 'document:1'),
+    ]).listSubjects({ permission: 'document.write', resource: 'document:1' });
+    expect(result.members).toEqual(['user:alice']);
+    expect(result.excluded).toEqual([]);
   });
 
   it('keeps a symbolic base symbolic after a subtraction', async () => {

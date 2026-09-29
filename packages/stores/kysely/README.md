@@ -1,6 +1,6 @@
 # @tsbouncer/kysely
 
-A [`KeymanStore`](../../core) over an application-owned [Kysely](https://kysely.dev) instance.
+A [`TupleStore`](../../core) over an application-owned [Kysely](https://kysely.dev) instance.
 
 Pass the same Kysely instance your app already uses. `tsbouncer` does not own your
 connection, your pool, or your transaction lifecycle.

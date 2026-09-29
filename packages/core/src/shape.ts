@@ -6,9 +6,15 @@
  * gives editor autocomplete without attempting full compile-time inference.
  */
 
+/**
+ * Only the *keys* matter here — every derivation below is a `keyof`. The value
+ * types are deliberately `unknown` so that a runtime `TypeDefinition` (whose
+ * permissions are AST nodes, not `true`) still satisfies this interface. Pinning
+ * them to `true` would make `PermissionOf<typeof model>` fail to compile.
+ */
 export interface TypeShape {
   readonly relations: Readonly<Record<string, unknown>>;
-  readonly permissions: Readonly<Record<string, true>>;
+  readonly permissions: Readonly<Record<string, unknown>>;
 }
 
 export interface ModelShape {
@@ -48,3 +54,20 @@ export type PermissionOf<M extends ModelShape> = {
 export type RelationsOf<M extends ModelShape, T extends TypeNames<M>> = RelationNames<
   M['types'][T]
 >;
+
+/**
+ * The precise shape carried by a `defineModel` result, for use with the helpers
+ * above.
+ *
+ * `Model['types']` is the runtime AST and is deliberately not intersected with the
+ * shape, so the shape has to be asked for separately:
+ *
+ * ```ts
+ * type DocPermission = PermissionOf<ModelShapeOf<typeof model>>;
+ * ```
+ */
+export type ModelShapeOf<M> = M extends { readonly __shape?: infer S | undefined }
+  ? NonNullable<S> extends ModelShape
+    ? NonNullable<S>
+    : never
+  : never;

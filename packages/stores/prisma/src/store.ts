@@ -1,10 +1,10 @@
 import type {
   DeleteInput,
-  KeymanStore,
-  KeymanStoreCapabilities,
   Page,
   ReadTupleQuery,
   Tuple,
+  TupleStore,
+  TupleStoreCapabilities,
   WriteInput,
 } from '@tsbouncer/core';
 import { formatRef, parseRef, StoreError } from '@tsbouncer/core';
@@ -42,7 +42,7 @@ export interface PrismaStoreOptions {
 
 const DEFAULT_BATCH = 500;
 
-const CAPABILITIES: KeymanStoreCapabilities = Object.freeze({
+const CAPABILITIES: TupleStoreCapabilities = Object.freeze({
   atomicWrite: true,
   persistent: true,
   atomicReplace: true,
@@ -52,7 +52,7 @@ const CAPABILITIES: KeymanStoreCapabilities = Object.freeze({
 });
 
 /**
- * A `KeymanStore` over an application-owned Prisma client.
+ * A `TupleStore` over an application-owned Prisma client.
  *
  * Pass the same `PrismaClient` your app already uses — Prisma 7 takes a driver
  * adapter in its constructor, and the store reuses whatever connection you built.
@@ -62,7 +62,7 @@ const CAPABILITIES: KeymanStoreCapabilities = Object.freeze({
 export function prismaStore(
   prisma: PrismaClient,
   options: PrismaStoreOptions = {},
-): KeymanStore {
+): TupleStore {
   const model = options.model ?? DEFAULT_MODEL;
   const delegate = (client: PrismaClient): PrismaClient => client[model];
   const uniqueKeyName = options.uniqueKeyName ?? KEY_FIELDS.join('_');

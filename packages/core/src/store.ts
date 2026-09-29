@@ -60,7 +60,7 @@ export type DeleteInput =
       readonly tuples: readonly Tuple[];
     };
 
-export interface KeymanStoreCapabilities {
+export interface TupleStoreCapabilities {
   /** Writes are applied as one all-or-nothing unit. */
   readonly atomicWrite: boolean;
   /** State survives process exit. */
@@ -75,7 +75,7 @@ export interface KeymanStoreCapabilities {
   readonly watch: boolean;
 }
 
-export const NO_CAPABILITIES: KeymanStoreCapabilities = Object.freeze({
+export const NO_CAPABILITIES: TupleStoreCapabilities = Object.freeze({
   atomicWrite: false,
   persistent: false,
   atomicReplace: false,
@@ -97,18 +97,18 @@ export const NO_CAPABILITIES: KeymanStoreCapabilities = Object.freeze({
  * Stores move tuples. They do not evaluate conditions, resolve permissions, or
  * decide anything.
  */
-export interface KeymanStore {
-  readonly capabilities: KeymanStoreCapabilities;
+export interface TupleStore {
+  readonly capabilities: TupleStoreCapabilities;
   read(query?: ReadTupleQuery): Promise<Page<Tuple>>;
   write(input: WriteInput): Promise<void>;
   delete(input: DeleteInput): Promise<void>;
 }
 
-export function assertStoreShape(value: unknown): asserts value is KeymanStore {
+export function assertStoreShape(value: unknown): asserts value is TupleStore {
   if (typeof value !== 'object' || value === null) {
     throw new TypeError('store must be an object');
   }
-  const store = value as Partial<KeymanStore>;
+  const store = value as Partial<TupleStore>;
   for (const method of ['read', 'write', 'delete'] as const) {
     if (typeof store[method] !== 'function') {
       throw new TypeError(`store is missing required method ${method}()`);

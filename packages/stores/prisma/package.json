@@ -1,7 +1,7 @@
 {
   "name": "@tsbouncer/prisma",
   "version": "0.0.0",
-  "description": "KeymanStore over an application-owned Prisma client. Requires Prisma 7+.",
+  "description": "TupleStore over an application-owned Prisma client. Requires Prisma 7+.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,

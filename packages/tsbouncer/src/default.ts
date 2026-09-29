@@ -1,4 +1,4 @@
-import type { Authz, EvaluationLimits, KeymanStore, Model } from '@tsbouncer/core';
+import type { Authz, EvaluationLimits, Model, TupleStore } from '@tsbouncer/core';
 import { createAuthz } from '@tsbouncer/core';
 import { jsonStore } from '@tsbouncer/json';
 import { memoryStore } from '@tsbouncer/memory';
@@ -25,7 +25,7 @@ export interface CreateDefaultAuthzOptions {
  * database behind it should call `createAuthz` with the store you already have.
  */
 export function createDefaultAuthz(options: CreateDefaultAuthzOptions): Authz {
-  const store: KeymanStore =
+  const store: TupleStore =
     options.file === undefined ? memoryStore() : jsonStore({ file: options.file });
   return createAuthz({
     model: options.model,
@@ -35,6 +35,6 @@ export function createDefaultAuthz(options: CreateDefaultAuthzOptions): Authz {
 }
 
 /** True when the chosen store survives the process. */
-export function isPersistent(store: KeymanStore): boolean {
+export function isPersistent(store: TupleStore): boolean {
   return store.capabilities.persistent;
 }

@@ -232,6 +232,35 @@ describe('formatExplain branches', () => {
     expect(formatExplain(result)).toContain('no tuple names a');
   });
 
+  it('never repeats a reason line', async () => {
+    // The formatter used to synthesize 'no matching tuples' for an empty node
+    // that *already* carried that exact string as its reason, so nearly every
+    // line of a deep denial was printed twice. Two adjacent identical lines are
+    // always a bug, whatever the node.
+    const result = await explainFor([T('user:alice', 'owner', 'document:1')], {
+      subject: 'user:bob',
+      permission: 'document.read',
+      resource: 'document:1',
+    });
+    const lines = formatExplain(result).split('\n');
+    for (let i = 1; i < lines.length; i += 1) {
+      expect(lines[i], `line ${i} repeats line ${i - 1}`).not.toBe(lines[i - 1]);
+    }
+  });
+
+  it('prints an empty reason once, not twice', async () => {
+    const result = await explainFor(
+      [T('user:alice', 'owner', 'document:1'), T('user:alice', 'member', 'team:eng')],
+      { subject: 'user:bob', permission: 'document.read', resource: 'document:1' },
+    );
+    const occurrences = (formatExplain(result).match(/no matching tuples/g) ?? []).length;
+    const inTree = flatten(result.tree).filter(
+      (n) => n.reason === 'no matching tuples',
+    ).length;
+    expect(occurrences).toBe(inTree);
+    expect(occurrences).toBeGreaterThan(0);
+  });
+
   it('renders a tuple-to-userset with both names', async () => {
     const result = await explainFor([T('folder:9', 'parent', 'document:1')], {
       subject: 'user:alice',

@@ -211,17 +211,22 @@ type ShapeOfConfig<C extends ModelConfig> = {
       relations: K extends keyof C['types']
         ? NonNullable<C['types'][K] extends { relations: infer R } ? R : never>
         : Record<never, never>;
+      // `permissions` is optional on `TypeConfig`, so a bare `defineType({})`
+      // infers a union with `undefined` and maps to a string index signature —
+      // which turns "this type has no permissions" into "any permission". Only
+      // an actually-declared record counts.
       permissions: K extends keyof C['types']
-        ? {
-            [P in keyof NonNullable<
-              C['types'][K] extends { permissions: infer P } ? P : never
-            > &
-              string]: true;
-          }
+        ? DeclaredPermissions<C['types'][K]>
         : Record<never, never>;
     };
   };
 };
+
+type DeclaredPermissions<T> = T extends { readonly permissions: infer P }
+  ? undefined extends NonNullable<P>
+    ? Record<never, never>
+    : { [K in keyof NonNullable<P> & string]: true }
+  : Record<never, never>;
 
 export interface TypeDefinition {
   readonly name: string;
@@ -230,12 +235,27 @@ export interface TypeDefinition {
 }
 
 export interface Model<M extends ModelShape = ModelShape> {
+  /**
+   * The runtime definitions. Deliberately *not* intersected with `M['types']`:
+   * doing so makes `types.doc.permissions.read` resolve to the shape's `true`
+   * rather than its `SetNode`, which is the AST the engine walks. The precise
+   * shape is reachable on its own via `ModelShapeOf`.
+   */
   readonly types: Readonly<Record<string, TypeDefinition>>;
   readonly conditions: Readonly<Record<string, ConditionDef>>;
   readonly __shape?: M;
 }
 
-export function defineType(config: TypeConfig = {}): TypeConfig {
+/**
+ * Identity at runtime; the generic is the point.
+ *
+ * Returning `TypeConfig` would erase every relation and permission name, and
+ * `ShapeOfConfig` derives autocomplete from exactly those names. Without this,
+ * `PermissionOf<typeof model>` collapses to `${string}.${string}`.
+ */
+export function defineType<const C extends TypeConfig = TypeConfig>(
+  config: C = {} as C,
+): C {
   return config;
 }
 
