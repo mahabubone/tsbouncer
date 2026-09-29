@@ -71,9 +71,20 @@ tsbouncer/
 └─ pnpm-workspace.yaml
 ```
 
-There is no `docs/`. `PLAN.md` is the design record and each example's `README.md`
-is the usage documentation; a prose site is not on the roadmap, and saying it is
-would be the same kind of claim this document is trying to stop making.
+**There is a docs site** (`docs/`, Astro 7 + Tailwind 4, static output). It is
+usage documentation and nothing else: `PLAN.md` remains the design record,
+`AGENTS.md` the working rules, and `examples/` the runnable programs. Earlier
+revisions of this file said there would be no site at all; that was wrong and was
+corrected once the content existed rather than before.
+
+The site's one non-obvious property is that **every TypeScript snippet on it is
+type-checked against the built package** (`pnpm docs:test`). Snippet rot is the
+normal fate of documentation, and the repository's READMEs carried unverified
+snippets for months. A snippet that stops compiling now fails CI.
+
+The site requires Node 22 (Astro 7's floor) while the library publishes
+`>=20.11`, so it is excluded from the library's turbo tasks and built by a separate
+CI job. The docs toolchain must not drag the library's Node floor up.
 
 ## Public API
 

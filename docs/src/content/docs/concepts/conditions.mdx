@@ -1,0 +1,205 @@
+---
+title: Conditions
+description: Attribute-gated access, the split between what the writer bound and what the caller knows.
+section: Concepts
+order: 12
+kind: guide
+---
+
+import Callout from '~/components/Callout.astro';
+
+A condition is a predicate in the model. Only its *name* and a few bound parameters
+live on the tuple, so tuples still serialize cleanly and a store never evaluates
+anything.
+
+## The split
+
+A condition has two halves of input, and keeping them apart is the whole idea.
+
+| | carried by | example |
+| --- | --- | --- |
+| what the **writer** bound | the tuple | `region: 'eu'` — part of the grant, stored with it |
+| what the **caller** knows now | the request | `callerRegion: 'us'` — not in the store at all |
+
+```ts setup
+import {
+  createAuthz,
+  defineCondition,
+  defineModel,
+  defineType,
+  memoryStore,
+  permission,
+  relation,
+} from 'tsbouncer';
+
+const model = defineModel({
+  types: {
+    user: defineType({}),
+    document: defineType({
+      relations: { viewer: relation('user') },
+      permissions: { read: permission.or('viewer') },
+    }),
+  },
+  conditions: {
+    sameRegion: defineCondition(
+      'sameRegion',
+      (ctx) => {
+        const { region, callerRegion } = ctx;
+        if (typeof region !== 'string' || typeof callerRegion !== 'string') return false;
+        return region === callerRegion;
+      },
+      { params: { region: 'string' as const } },
+    ),
+  },
+});
+
+const authz = createAuthz({ model, store: memoryStore() });
+
+await authz.grant({
+  subject: 'user:dave',
+  relation: 'viewer',
+  resource: 'document:1',
+  condition: 'sameRegion',
+  context: { region: 'eu' },
+});
+```
+
+```ts
+await authz.check(
+  { subject: 'user:dave', permission: 'document.read', resource: 'document:1' },
+  { context: { callerRegion: 'eu' } },
+); // allowed — the caller's region matches what the writer bound
+
+await authz.check(
+  { subject: 'user:dave', permission: 'document.read', resource: 'document:1' },
+  { context: { callerRegion: 'us' } },
+); // denied
+```
+
+## The tuple is authoritative
+
+The predicate sees `{ ...request, ...tuple }` — the tuple's bindings win on every
+conflict. If the request could override `region`, a caller could rewrite the
+constraint the grant was written with, and the condition would be theatre.
+
+```ts
+// Still denied: the request says region "us", but the tuple bound "eu", and
+// the merged context is eu — so eu !== us.
+await authz.check(
+  { subject: 'user:dave', permission: 'document.read', resource: 'document:1' },
+  { context: { callerRegion: 'us', region: 'eu' } },
+);
+```
+
+<Callout type="tip" title="This is why the app owns the context">
+The dangerous way to use conditions is to let a client supply the whole context
+object. Build it from the session, the database, and the clock — values the caller
+cannot forge — and the authority rule has nothing to defend.
+</Callout>
+
+## params is about detecting absence
+
+The `params` schema governs what a **tuple** may bind, not everything the predicate
+reads. Its real job is making a *missing* key detectable: a JavaScript predicate
+reading an absent key just gets `undefined` and quietly returns `false`, which is
+indistinguishable from a genuine denial. Declaring params turns that silence into a
+reason in `explain()`.
+
+```ts
+// Denied, and explain() says which of the two keys was missing.
+await authz.check(
+  { subject: 'user:dave', permission: 'document.read', resource: 'document:1' },
+  { context: { callerRegion: 'eu' } },
+);
+```
+
+Unknown or mistyped bound parameters are rejected at `grant` time, where a typo is
+still cheap to fix:
+
+```ts
+await authz.grant({
+  subject: 'user:dave',
+  relation: 'viewer',
+  resource: 'document:1',
+  condition: 'sameRegion',
+  context: { regoin: 'eu' }, // TupleValidationError
+});
+```
+
+## Narrowing
+
+A predicate's context is `{ [key: string]: unknown }`. `params` governs write-time
+validation; it does not type the predicate. So a predicate narrows everything it
+reads, including keys it declared itself.
+
+```ts
+// `ctx.seatsUsed` and `ctx.seatsTotal` are both `unknown` without this, because
+// `seatsTotal` is declared but the declaration does not reach the predicate type.
+const activeSeat = defineCondition(
+  'activeSeat',
+  (ctx) => {
+    const { plan, seatsUsed, minimumPlan, seatsTotal } = ctx;
+    if (typeof plan !== 'string' || typeof seatsUsed !== 'number') return false;
+    if (typeof minimumPlan !== 'string' || typeof seatsTotal !== 'number') return false;
+    return plan === minimumPlan && seatsUsed < seatsTotal;
+  },
+  { params: { minimumPlan: 'string' as const, seatsTotal: 'number' as const } },
+);
+void activeSeat;
+```
+
+<Callout type="caution" title="This is a known gap, not a design decision">
+`ConditionContext` is untyped, so this boilerplate is required. It is the sharpest
+ergonomic edge in the API today and is being fixed; the narrowing is also why the
+values a predicate reads are attacker-influenced and worth checking.
+</Callout>
+
+## Every failure path denies
+
+In order: an undeclared condition, a missing declared param, a wrong param type, a
+predicate that threw, and a predicate that returned false. All five resolve to **not
+allowed**, and each carries a reason.
+
+```ts
+import { formatExplain } from 'tsbouncer';
+
+const denied = await authz.explain({
+  subject: 'user:dave',
+  permission: 'document.read',
+  resource: 'document:1',
+});
+if (!denied.allowed) console.log(formatExplain(denied));
+```
+
+```
+DENIED  user:dave -> document:1#document.read
+  + viewer
+    - direct
+      user:dave#viewer@document:1
+      - condition
+        sameRegion returned false
+  (2 reads)
+```
+
+A condition that throws is never allowed through. The library is confused, so it
+says no.
+
+## A condition with no bound parameters
+
+A condition can be decided entirely by request state, which is the right shape for
+"this account is suspended":
+
+```ts
+const notSuspended = defineCondition('notSuspended', (ctx) => ctx.suspended === false, {
+  params: {},
+});
+void notSuspended;
+```
+
+There is nothing for a writer to bind, so no grant context is needed — and a
+suspended account cannot be rescued by any grant.
+
+## Next
+
+- [API: model builders](/api/model#definecondition)
+- [Recipe: ABAC](/recipes/abac) — a worked example with two conditions.

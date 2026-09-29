@@ -1,0 +1,119 @@
+---
+title: Errors
+description: The codes, what raises them, and which ones are a denial.
+section: Reference
+order: 23
+kind: reference
+---
+
+import Callout from '~/components/Callout.astro';
+
+```ts setup
+import { createAuthz, defineModel, defineType, memoryStore, permission, relation } from 'tsbouncer';
+import type { Authz, CheckRequest } from 'tsbouncer';
+
+const model = defineModel({
+  types: {
+    user: defineType({}),
+    document: defineType({
+      relations: { owner: relation(['user']) },
+      permissions: { read: permission.or('owner') },
+    }),
+  },
+});
+
+const authz: Authz = createAuthz({ model, store: memoryStore() });
+const request: CheckRequest = {
+  subject: 'user:alice',
+  permission: 'document.read',
+  resource: 'document:1',
+};
+```
+
+Every public error extends `AuthorizationError` and carries a stable `code`, so an
+application can branch on it without matching on messages.
+
+```ts
+import { isAuthorizationError } from 'tsbouncer';
+
+try {
+  await authz.assert(request);
+} catch (error) {
+  if (isAuthorizationError(error)) {
+    console.log(error.code, error.details);
+  }
+}
+```
+
+## The codes
+
+| code | raised when | what it means for you |
+| --- | --- | --- |
+| `access_denied` | a check was denied | the normal 403 path |
+| `invalid_reference` | a reference is malformed, or names a type the model does not declare | a bug, or unvalidated input |
+| `invalid_tuple` | a write is rejected by model validation | a bad grant — 400, **not** 403 |
+| `invalid_model` | `defineModel` was given a model that does not hold together | a boot-time bug |
+| `evaluation_limit` | a depth, node, or time budget ran out | fail closed, and log it |
+| `store_error` | the store rejected a read or write | a database problem, not a denial |
+
+## The distinction that matters
+
+<Callout type="caution" title="A denied check and a broken check are different events">
+`isAuthorizationError` is true for `access_denied` *and* for `invalid_tuple`.
+Mapping both to 403 is how a typo in a request body reports itself to the user as
+"you are not allowed", with nothing in the logs to say the server is at fault.
+Branch on `code`.
+</Callout>
+
+```ts
+function statusFor(error: unknown): number {
+  if (isAuthorizationError(error)) {
+    if (error.code === 'access_denied') return 403;
+    if (error.code === 'invalid_tuple') return 400;
+    return 403; // evaluation_limit and friends: still fails closed
+  }
+  return 500;
+}
+```
+
+## Failing closed
+
+A condition that throws, a missing or mistyped context key, a condition the model
+no longer declares, an unresolvable reference, a cycle, and an exhausted budget all
+resolve to **not allowed**. Never allowed, and never thrown through to the caller
+from an evaluation.
+
+`evaluation_limit` is the one worth alerting on. A denial because the graph said no
+and a denial because the graph gave up look identical to a caller and very
+different to you.
+
+## ModelDefinitionError
+
+Thrown by `defineModel` for a model that does not hold together, at boot:
+
+- a type name that is not `[a-z_][a-z0-9_]*`
+- a condition registered under a different name than its definition
+- a relation and a permission sharing a name
+- a cross-type reference to a relation that does not exist
+- a cycle the validator can see
+
+Some cycles are invisible to a model-level check — a `through` relation can loop in
+a way only a runtime walk finds. The evaluator carries an `active` set for those, so
+the walk terminates and denies.
+
+## TupleValidationError
+
+Thrown at write time, which is the point:
+
+- a relation the type does not declare
+- a subject type the relation does not accept
+- bound condition parameters that are unknown or mistyped
+- context supplied without a condition
+
+Catching these at `grant` rather than at `check` is the difference between a typo
+that took five seconds and a permission that silently denied for six months.
+
+## Next
+
+- [API: client](/api/client#assert)
+- [Debugging](/recipes/debugging)

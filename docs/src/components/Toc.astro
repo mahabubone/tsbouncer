@@ -1,0 +1,41 @@
+---
+import type { MarkdownHeading } from 'astro';
+
+interface Props {
+  headings: MarkdownHeading[];
+}
+
+/**
+ * "On this page", from the rendered headings.
+ *
+ * h2 and h3 only: a docs page with a four-level outline has an outline problem,
+ * and a table of contents that lists forty entries is a wall.
+ */
+const { headings } = Astro.props;
+const items = headings.filter((h) => h.depth === 2 || h.depth === 3);
+---
+
+{
+  items.length > 0 && (
+    <nav aria-label="On this page" class="py-6">
+      <p class="mb-3 text-xs font-semibold tracking-wider text-[var(--text-subtle)] uppercase">
+        On this page
+      </p>
+      <ul class="flex flex-col gap-1.5 border-l border-[var(--border)] text-sm">
+        {items.map((h) => (
+          <li>
+            <a
+              href={`#${h.slug}`}
+              class:list={[
+                '-ml-px block border-l border-transparent py-0.5 text-[var(--text-muted)] transition-colors hover:border-[var(--accent)] hover:text-[var(--text)]',
+                h.depth === 3 ? 'pl-6' : 'pl-3 font-medium',
+              ]}
+            >
+              {h.text}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  )
+}

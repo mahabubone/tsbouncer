@@ -1,0 +1,249 @@
+---
+title: The model
+description: Every shape the evaluator understands, and the two that surprise people.
+section: Concepts
+order: 10
+kind: guide
+---
+
+import Callout from '~/components/Callout.astro';
+
+A model is a set of **types**, each with **relations** and **permissions**. It is
+code, and it is validated at `defineModel` time. Relations are where tuples may be
+written; permissions are what you ask about.
+
+```ts setup
+import {
+  createAuthz,
+  defineCondition,
+  defineModel,
+  defineType,
+  memoryStore,
+  permission,
+  relation,
+  ttu,
+  wildcard,
+} from 'tsbouncer';
+
+const model = defineModel({
+  types: {
+    user: defineType({}),
+    team: defineType({ relations: { member: relation(['user']) } }),
+    folder: defineType({
+      relations: {
+        viewer: relation('user').or(relation('team', { through: 'member' })),
+        parent: relation('folder'),
+      },
+      permissions: { read: permission.or('viewer', ttu('parent', 'read')) },
+    }),
+    document: defineType({
+      relations: {
+        owner: relation(['user']),
+        editor: relation('user').or(relation('team', { through: 'member' })),
+        parent: relation('folder'),
+        banned: relation('user').or(wildcard('user')),
+        anyone: relation('user').or(wildcard('user')),
+      },
+      permissions: {
+        read: permission.or('owner', 'editor', 'anyone', ttu('parent', 'read')),
+        write: permission.allOf('owner', 'editor').except('banned'),
+        public: permission.or('anyone'),
+      },
+    }),
+  },
+});
+
+const authz = createAuthz({ model, store: memoryStore() });
+```
+
+## Relations
+
+A relation says which subject types may be written against a resource of this
+type.
+
+```ts
+document: defineType({
+  relations: {
+    owner: relation(['user']), // a user, named
+    editor: relation('user'), // also a user
+  },
+});
+```
+
+A string and a one-element array are the same thing. An array is clearer when a
+relation accepts more than one type.
+
+### Userset edges
+
+`relation(type, { through })` is the shape that lets a *group* grant to its
+members without naming them.
+
+```ts
+editor: relation('user').or(relation('team', { through: 'member' })),
+```
+
+Two things about this that are easy to get wrong:
+
+**The tuple's subject is a userset, not the object.** The subject is the group
+qualified by the relation the edge walks.
+
+```ts
+await authz.write([
+  { subject: 'user:alice', relation: 'member', resource: 'team:eng' },
+  { subject: 'team:eng#member', relation: 'editor', resource: 'document:2' },
+]);
+```
+
+Writing `{ subject: 'team:eng', relation: 'editor', … }` is rejected at write
+time, which is a useful error rather than a silent deny.
+
+**`through` must name a relation, not a permission.** Inheriting `write` from a
+folder is a `ttu`, not a userset edge — see below.
+
+### Wildcards
+
+`wildcard(type)` declares that a relation accepts a `user:*` subject, which is
+how you write a "public to everyone, including people who do not exist yet" grant.
+
+```ts
+anyone: relation('user').or(wildcard('user')),
+```
+
+```ts
+await authz.grant({ subject: 'user:*', relation: 'anyone', resource: 'document:3' });
+```
+
+<Callout type="caution" title="Declaring a wildcard is not a grant">
+`wildcard('user')` says the relation *accepts* a `user:*` subject. It does not
+put every user in the set. A relation grants nobody until a tuple exists — which
+matters most for ban lists, where `banned: relation('user').or(wildcard('user'))`
+with no tuple must mean "nobody is banned", not "everybody is".
+</Callout>
+
+## Permissions
+
+Permissions are what you ask about. They are built from relation names and from
+each other.
+
+```ts
+permissions: {
+  read: permission.or('owner', 'editor', 'anyone', ttu('parent', 'read')),
+  write: permission.allOf('owner', 'editor').except('banned'),
+}
+```
+
+`permission.or` is a union, `permission.allOf` is an intersection, and `.except`
+is an exclusion. All three chain, and you can use the fluent form too:
+
+```ts
+viewer: relation('user')
+  .or(relation('team', { through: 'member' }))
+  .or(relation('role', { through: 'holder' }))
+  .or(wildcard('user'));
+```
+
+### Union
+
+Any branch grants it. This is the common case.
+
+### Intersection
+
+**Every** branch must hold. Useful for "this document is editable, and only by
+someone who can also edit the workspace".
+
+```ts
+write: permission.allOf('owner', 'editor'),
+```
+
+### Exclusion
+
+Removes an access the base granted. Both sides are always evaluated — returning
+early on a satisfied base is the bug this shape exists to prevent.
+
+```ts
+write: permission.allOf('owner', 'editor').except('banned'),
+```
+
+### Tuple-to-userset
+
+Follow a relation to another object and take a member there. This is inheritance,
+and it is how permissions propagate down a tree.
+
+```ts
+folder: defineType({
+  relations: { viewer: relation('user'), parent: relation('folder') },
+  permissions: { read: permission.or('viewer', ttu('parent', 'read')) },
+});
+```
+
+`ttu('parent', 'read')` means "follow `parent`, then take `read` over there". The
+direction is the trap: it recurses into the tuple's **subject**, so the object
+the walk started from is not re-tested. Getting it backwards walks back up the
+edge and denies everything.
+
+<Callout type="caution" title="A relation is a property of its resource">
+`{ subject: 'folder:backend', relation: 'parent', resource: 'document:api' }` reads
+"document:api's parent is folder:backend". The parent is the subject. This is the
+single most common mistake with this model, and write-time validation rejects the
+reverse — but it is still the one to check first when inheritance does not work.
+</Callout>
+
+## Conditions
+
+A condition is a predicate in the model. Only its *name* and a few bound
+parameters live on the tuple, so tuples still serialize cleanly and a store never
+evaluates anything.
+
+```ts
+const conditionalModel = defineModel({
+  types: { user: defineType({}), doc: defineType({}) },
+  conditions: {
+    sameRegion: defineCondition(
+      'sameRegion',
+      (ctx) => {
+        const { region, callerRegion } = ctx;
+        if (typeof region !== 'string' || typeof callerRegion !== 'string') return false;
+        return region === callerRegion;
+      },
+      { params: { region: 'string' as const } },
+    ),
+  },
+});
+```
+
+Conditions are covered in depth on [Conditions](/concepts/conditions).
+
+## Putting the shapes together
+
+The three styles compose, which is what real systems need:
+
+```ts
+document: defineType({
+  relations: {
+    owner: relation('user'),
+    editor: relation('user')
+      .or(relation('role', { through: 'holder' })) // RBAC: a role attached here
+      .or(relation('team', { through: 'member' })) // ReBAC: a group
+      .or(wildcard('user')), // public
+    parent: relation('folder'),
+    banned: relation('user').or(wildcard('user')),
+  },
+  permissions: {
+    read: permission.or('owner', 'editor', ttu('parent', 'read')),
+    write: permission
+      .or(permission.allOf('owner', 'editor'), ttu('parent', 'write'))
+      .except('banned'),
+  },
+});
+```
+
+`write` has two ways in, and the difference is the point. Directly it needs
+`owner` **and** `editor`, so attaching an editor role to a document does not hand
+out write to everyone holding it. Inherited, it follows the parent folder's
+`write`. The exclusion wraps both, and neither branch may short-circuit it.
+
+## Next
+
+- [Data](/concepts/data) — the reference format and write-time validation.
+- [Conditions](/concepts/conditions) — attribute-gated access.
+- [API: model builders](/api/model) — every builder, with signatures.

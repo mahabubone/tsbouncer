@@ -1,0 +1,148 @@
+---
+title: RBAC — roles on resources
+description: Attach a role to a resource instead of naming people, so onboarding is one write.
+section: Recipes
+order: 30
+kind: recipe
+---
+
+import Callout from '~/components/Callout.astro';
+
+## The situation
+
+A product has an `editor` concept. Three people are editors, that changes monthly,
+and nobody wants to touch a list of user ids in eight different places.
+
+## The model
+
+A `role` is a type whose `holder` relation is the assignment, and a userset edge is
+how a resource picks up "everyone holding that role".
+
+```ts setup
+import {
+  createAuthz,
+  defineModel,
+  defineType,
+  memoryStore,
+  permission,
+  relation,
+} from 'tsbouncer';
+
+const model = defineModel({
+  types: {
+    user: defineType({}),
+    role: defineType({ relations: { holder: relation('user') } }),
+    document: defineType({
+      relations: {
+        owner: relation('user'),
+        editor: relation('user').or(relation('role', { through: 'holder' })),
+      },
+      permissions: {
+        read: permission.or('owner', 'editor'),
+        write: permission.allOf('owner', 'editor'),
+      },
+    }),
+  },
+});
+
+const authz = createAuthz({ model, store: memoryStore() });
+```
+
+## The data
+
+Two kinds of tuple, and they answer different questions.
+
+```ts
+// Who holds the role. This changes when someone joins or leaves.
+await authz.grant({ subject: 'user:alice', relation: 'holder', resource: 'role:acme:editor' });
+await authz.grant({ subject: 'user:bob', relation: 'holder', resource: 'role:acme:editor' });
+
+// Which resources carry it. This changes when a document is created.
+await authz.grant({
+  subject: 'role:acme:editor#holder',
+  relation: 'editor',
+  resource: 'document:1',
+});
+```
+
+<Callout type="caution" title="The subject is a userset, not the object">
+`role:acme:editor#holder`, not `role:acme:editor`. The subject is the role qualified
+by the relation the edge walks. Writing the shorter form is rejected at write time,
+which is a useful error rather than a silent deny.
+</Callout>
+
+## The result
+
+```ts
+await authz.can('user:alice', 'document.write', 'document:1'); // true  — owner and editor
+await authz.can('user:bob', 'document.write', 'document:1'); // false — editor, not owner
+await authz.can('user:bob', 'document.read', 'document:1'); // true
+```
+
+## What this actually bought
+
+**Onboarding is one write and touches no document.**
+
+```ts
+await authz.grant({ subject: 'user:carol', relation: 'holder', resource: 'role:acme:editor' });
+// document:1 is now editable-read for carol. Nothing else changed.
+```
+
+That is the whole argument for modelling roles as data rather than as a column. A
+global admin stops being a magic string in a function signature and becomes a
+relation.
+
+## Do not let a role hand out everything
+
+The `write` permission above needs `owner` **and** `editor`, so an editor role does
+not by itself grant write. Without that intersection, attaching `editor` to a
+document would hand write to everyone holding it — which is rarely what "editor"
+means.
+
+```ts
+write: permission.allOf('owner', 'editor'),
+```
+
+## Roles can be scoped to a container
+
+A role object is just an object, so an *instance* role can administer a *tenant*
+without the tenant naming anyone:
+
+```ts
+const workspaceModel = defineModel({
+  types: {
+    user: defineType({}),
+    role: defineType({ relations: { holder: relation('user') } }),
+    workspace: defineType({
+      relations: {
+        admin: relation('user').or(relation('role', { through: 'holder' })),
+      },
+      permissions: { administer: permission.or('admin') },
+    }),
+  },
+});
+
+const scoped = createAuthz({ model: workspaceModel, store: memoryStore() });
+
+await scoped.grant({ subject: 'user:root', relation: 'holder', resource: 'role:instance:admin' });
+await scoped.grant({
+  subject: 'role:instance:admin#holder',
+  relation: 'admin',
+  resource: 'workspace:globex',
+});
+void scoped;
+
+await scoped.can('user:root', 'workspace.administer', 'workspace:globex'); // true
+await scoped.can('user:alice', 'workspace.administer', 'workspace:globex'); // false
+```
+
+## What this is not
+
+RBAC alone cannot express "the manager of the people who can see this document".
+That is a graph, and it is [the next recipe](/recipes/rebac). Most real models
+need both.
+
+## Next
+
+- [ReBAC](/recipes/rebac) — ownership, groups, and inheritance.
+- [ABAC](/recipes/abac) — gating on state the graph cannot hold.

@@ -1,0 +1,233 @@
+---
+import type { MarkdownHeading } from 'astro';
+import Sidebar from '~/components/Sidebar.astro';
+import Toc from '~/components/Toc.astro';
+import '~/styles/global.css';
+
+interface Props {
+  title: string;
+  description: string;
+  headings: MarkdownHeading[];
+  /** Sidebar entry id, without the leading slash. */
+  current: string | undefined;
+  kind?: 'guide' | 'reference' | 'recipe';
+  status?: 'stable' | 'preview' | 'planned';
+}
+
+const { title, description, headings, current, kind = 'guide', status = 'stable' } =
+  Astro.props;
+const path = Astro.url.pathname;
+---
+
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title} · tsbouncer</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={new URL(path, Astro.site)} />
+    <meta property="og:title" content={`${title} · tsbouncer`} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%233b6ef5'/%3E%3Cpath d='M9 22V10h5.2c2.6 0 4.2 1.3 4.2 3.4 0 1.5-.8 2.5-2.1 2.9l2.6 5.7h-2.9l-2.3-5.3h-2.3V22H9zm2.4-7.2h2.6c1.1 0 1.8-.5 1.8-1.4s-.7-1.4-1.8-1.4h-2.6v2.8z' fill='white'/%3E%3Ccircle cx='23' cy='19' r='2.5' fill='white'/%3E%3C/svg%3E"
+    />
+    <script is:inline>
+      // Applied before first paint. A theme that flashes white on every navigation
+      // is the single most common way a docs site gets dismissed as amateur.
+      (() => {
+        const stored = localStorage.getItem('tsbouncer-theme');
+        const dark = stored
+          ? stored === 'dark'
+          : window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.classList.toggle('dark', dark);
+      })();
+    </script>
+  </head>
+
+  <body class="min-h-screen">
+    <a
+      href="#content"
+      class="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50 focus:rounded-lg focus:bg-[var(--accent)] focus:px-4 focus:py-2 focus:text-white"
+    >
+      Skip to content
+    </a>
+
+    <header
+      class="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--surface)]/85 backdrop-blur-md"
+    >
+      <div class="mx-auto flex h-14 max-w-(--container) items-center gap-4 px-4">
+        <button
+          id="nav-toggle"
+          type="button"
+          aria-label="Toggle navigation"
+          aria-expanded="false"
+          aria-controls="sidebar"
+          class="-ml-1 rounded-md p-2 text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)] md:hidden"
+        >
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path
+              d="M3 5h14M3 10h14M3 15h14"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"></path>
+          </svg>
+        </button>
+
+        <a href="/" class="flex items-center gap-2 font-semibold tracking-tight">
+          <span
+            class="grid h-6 w-6 place-items-center rounded-md bg-[var(--accent)] text-[0.8125rem] font-bold text-[var(--accent-contrast)]"
+            aria-hidden="true"
+            >t</span
+          >
+          <span>tsbouncer</span>
+        </a>
+
+        <span
+          class="rounded-full border border-[var(--border)] px-2 py-0.5 font-mono text-[0.6875rem] text-[var(--text-subtle)]"
+          >1.0.0-dev.0</span
+        >
+
+        <div class="ml-auto flex items-center gap-1">
+          {
+            status !== 'stable' && (
+              <span
+                class:list={[
+                  'mr-2 rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold',
+                  status === 'preview'
+                    ? 'bg-[var(--color-flag-warn)]/15 text-[var(--color-flag-warn)]'
+                    : 'bg-[var(--color-flag-fail)]/15 text-[var(--color-flag-fail)]',
+                ]}
+              >
+                {status}
+              </span>
+            )
+          }
+          <a
+            href="/api/client"
+            class="hidden rounded-lg px-3 py-1.5 text-sm text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)] sm:block"
+            >API</a
+          >
+          <a
+            href="https://github.com/tsbouncer/tsbouncer"
+            rel="noreferrer noopener"
+            class="rounded-lg p-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
+            aria-label="GitHub"
+          >
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+              <path
+                d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.4 7.4 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"
+              ></path>
+            </svg>
+          </a>
+          <button
+            id="theme-toggle"
+            type="button"
+            aria-label="Toggle dark mode"
+            class="rounded-lg p-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
+          >
+            <svg
+              class="hidden dark:block"
+              width="18"
+              height="18"
+              viewBox="0 0 20 20"
+              fill="none"
+              aria-hidden="true"
+            >
+              <circle cx="10" cy="10" r="4" stroke="currentColor" stroke-width="1.5"></circle>
+              <path
+                d="M10 1v2M10 17v2M19 10h-2M3 10H1M16.4 3.6l-1.4 1.4M5 15l-1.4 1.4M16.4 16.4 15 15M5 5 3.6 3.6"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"></path>
+            </svg>
+            <svg
+              class="block dark:hidden"
+              width="18"
+              height="18"
+              viewBox="0 0 20 20"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M17 12.5A7 7 0 0 1 7.5 3a7 7 0 1 0 9.5 9.5Z"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linejoin="round"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div class="mx-auto flex max-w-(--container)">
+      <aside
+        id="sidebar"
+        class="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-64 shrink-0 overflow-y-auto border-r border-[var(--border)] px-3 md:block"
+      >
+        <Sidebar current={current} />
+      </aside>
+
+      <main id="content" class="min-w-0 flex-1 px-5 py-10 sm:px-8">
+        <div class="mx-auto max-w-3xl">
+          <div
+            class="mb-6 flex items-center gap-2 text-xs font-medium text-[var(--text-subtle)]"
+          >
+            <span class="uppercase tracking-wider">{kind}</span>
+          </div>
+          <h1
+            class="mb-3 text-4xl font-bold tracking-tight text-balance"
+            style="letter-spacing: -0.02em"
+          >
+            {title}
+          </h1>
+          <p class="mb-10 text-lg text-[var(--text-muted)] text-pretty">{description}</p>
+
+          <div class="prose-docs">
+            <slot />
+          </div>
+        </div>
+      </main>
+
+      <aside
+        class="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-60 shrink-0 overflow-y-auto border-l border-[var(--border)] px-4 xl:block"
+      >
+        <Toc headings={headings} />
+      </aside>
+    </div>
+
+    <footer class="border-t border-[var(--border)]">
+      <div
+        class="mx-auto flex max-w-(--container) flex-col gap-2 px-5 py-8 text-sm text-[var(--text-subtle)] sm:flex-row sm:items-center sm:justify-between sm:px-8"
+      >
+        <p>
+          tsbouncer <span class="font-mono">1.0.0-dev.0</span> · MIT · ESM only
+        </p>
+        <p>
+          Pre-1.0. The API is not settled, and the
+          <a href="/reference/guarantees" class="text-[var(--accent)] underline">guarantees page</a>
+          is checked on every build.
+        </p>
+      </div>
+    </footer>
+
+    <script is:inline>
+      const root = document.documentElement;
+
+      document.getElementById('theme-toggle')?.addEventListener('click', () => {
+        const dark = !root.classList.contains('dark');
+        root.classList.toggle('dark', dark);
+        localStorage.setItem('tsbouncer-theme', dark ? 'dark' : 'light');
+      });
+
+      const toggle = document.getElementById('nav-toggle');
+      const sidebar = document.getElementById('sidebar');
+      toggle?.addEventListener('click', () => {
+        const open = sidebar?.classList.toggle('hidden') === false;
+        toggle.setAttribute('aria-expanded', String(open));
+      });
+    </script>
+  </body>
+</html>

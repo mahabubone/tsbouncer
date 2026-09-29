@@ -1,0 +1,174 @@
+---
+title: Wiring it into HTTP
+description: Express, Hono, Fastify — and why there is no middleware.
+section: Recipes
+order: 34
+kind: recipe
+---
+
+import Callout from '~/components/Callout.astro';
+
+## There is no middleware, on purpose
+
+`tsbouncer` ships no framework adapter and no `requirePermission()` wrapper. That is
+a decision, not an omission: a library that ships middleware has chosen your call
+sites, and an app with a REST endpoint, a GraphQL resolver, and a queue consumer
+rarely wants the same wrapper three times.
+
+What it does give you is one function you call wherever a decision is actually
+needed. Here is the whole integration.
+
+## Identity first
+
+The library has no idea who is asking, and that is where your session lives.
+
+```ts ts-skip
+import { type Request } from 'express';
+import { type Authz } from '@tsbouncer/core';
+
+function callerOf(req: Request) {
+  const userId = req.header('x-user-id');
+  if (!userId) throw new HttpError(401, 'unauthenticated', 'sign in first');
+  return { userId, ref: `user:${userId}` as const };
+}
+```
+
+A real deployment reads a session cookie or verifies a token here and returns the
+same shape. Everything downstream takes the reference and stops caring.
+
+## Two shapes of check
+
+`can` and an explicit branch, for a denial that is a normal outcome:
+
+```ts ts-skip
+app.get('/api/documents/:id', async (req, res) => {
+  const caller = callerOf(req);
+  const allowed = await authz.can(caller.ref, 'document.read', `document:${req.params.id}`);
+
+  if (!allowed) {
+    res.status(403).json({ error: 'forbidden' });
+    return;
+  }
+  res.json(await loadDocument(req.params.id));
+});
+```
+
+`assert` and one error handler, for a route that must not serve this user at all:
+
+```ts ts-skip
+app.post('/api/documents/:id/roles', async (req, res) => {
+  const caller = callerOf(req);
+
+  await authz.assert({
+    subject: caller.ref,
+    permission: 'document.write',
+    resource: `document:${req.params.id}`,
+  });
+
+  await authz.grant({
+    subject: `role:${req.body.role}#holder`,
+    relation: 'editor',
+    resource: `document:${req.params.id}`,
+  });
+
+  res.status(201).json({ ok: true });
+});
+```
+
+## The error handler is the part people get wrong
+
+`isAuthorizationError` is true for a **denied check** *and* for a **rejected
+write**. Mapping both to 403 is how a typo in a request body reports itself to the
+user as "you are not allowed", with nothing in the logs to say the server is at
+fault.
+
+```ts ts-skip
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  if (err instanceof HttpError) return res.status(err.status).json({ error: err.code });
+  if (isAuthorizationError(err)) {
+    if (err.code === 'access_denied') return res.status(403).json({ error: err.code });
+    if (err.code === 'invalid_tuple') return res.status(400).json({ error: err.code });
+    // evaluation_limit and friends: the library is confused, so it said no. Fail
+    // closed, but say so in the log — this is the one that means "we do not know".
+    console.error('authorization failed closed:', err);
+    return res.status(403).json({ error: err.code });
+  }
+  res.status(500).json({ error: 'internal_error' });
+});
+```
+
+## The other frameworks
+
+The shape is identical; only the request and response objects change.
+
+```ts ts-skip
+// Hono
+app.get('/api/documents/:id', async (c) => {
+  const subject = `user:${c.req.header('x-user-id')}`;
+  if (!(await authz.can(subject, 'document.read', `document:${c.req.param('id')}`))) {
+    return c.json({ error: 'forbidden' }, 403);
+  }
+  return c.json(await loadDocument(c.req.param('id')));
+});
+```
+
+```ts ts-skip
+// Fastify
+app.get('/api/documents/:id', async (request, reply) => {
+  const subject = `user:${request.headers['x-user-id']}`;
+  const allowed = await authz.can(subject, 'document.read', `document:${request.params.id}`);
+  return allowed ? { document: await loadDocument(request.params.id) } : reply.code(403).send({ error: 'forbidden' });
+});
+```
+
+## The list endpoint
+
+```ts ts-skip
+app.get('/api/documents', async (req, res) => {
+  const caller = callerOf(req);
+  const { resources, truncated } = await authz.listResources({
+    subject: caller.ref,
+    permission: 'document.read',
+    context: { callerRegion: caller.region },
+  });
+
+  res.json({ documents: await loadAll(resources), truncated });
+});
+```
+
+One query instead of a scan with a `can()` per row, inheritance included. Pass
+`truncated` through — a UI that renders a partial list as complete is the bug this
+flag exists to prevent.
+
+## "Why can't they open it?"
+
+The question every authorization system gets, and the one nobody designs for.
+
+```ts ts-skip
+app.get('/api/documents/:id/why', async (req, res) => {
+  const caller = callerOf(req);
+  const result = await authz.explain({
+    subject: String(req.query.subject),
+    permission: 'document.read',
+    resource: `document:${req.params.id}`,
+  });
+
+  res.json({ allowed: result.allowed, reads: result.reads, trace: result.tree });
+});
+```
+
+Evaluate it with the *asking* caller's context, as above — a trace computed
+without their own state explains a decision nobody made. See
+[Debugging](/recipes/debugging).
+
+## A runnable version of this page
+
+The repository's `express-app` example is a complete documents API over real
+sockets, with the same scenarios run against memory, a JSON file, and SQLite — and
+a Vitest suite asserting them. It is the thing this recipe is describing, if you
+want to read working code.
+
+## Next
+
+- [Debugging](/recipes/debugging)
+- [Errors](/api/errors)

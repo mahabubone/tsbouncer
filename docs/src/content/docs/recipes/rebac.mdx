@@ -1,0 +1,152 @@
+---
+title: ReBAC — relationships and inheritance
+description: Ownership, groups, folder trees, and the tuple direction everyone gets wrong.
+section: Recipes
+order: 31
+kind: recipe
+---
+
+import Callout from '~/components/Callout.astro';
+
+## The situation
+
+Access is mostly about relationships: a team, a folder tree, a document shared with
+one person. There is no fixed list of roles, and writing a recursive CTE in
+application code is how a permission system becomes unexplainable.
+
+## Ownership, groups, and inheritance
+
+```ts setup
+import {
+  createAuthz,
+  defineModel,
+  defineType,
+  memoryStore,
+  permission,
+  relation,
+  ttu,
+} from 'tsbouncer';
+
+const model = defineModel({
+  types: {
+    user: defineType({}),
+    team: defineType({ relations: { member: relation(['user']) } }),
+    folder: defineType({
+      relations: {
+        owner: relation('user').or(relation('team', { through: 'member' })),
+        parent: relation('folder'),
+      },
+      permissions: {
+        read: permission.or('owner', ttu('parent', 'read')),
+        write: permission.or('owner', ttu('parent', 'write')),
+      },
+    }),
+    document: defineType({
+      relations: {
+        owner: relation('user'),
+        viewer: relation('user').or(relation('team', { through: 'member' })),
+        parent: relation('folder'),
+      },
+      permissions: {
+        read: permission.or('owner', 'viewer', ttu('parent', 'read')),
+        write: permission.allOf('owner', ttu('parent', 'write')),
+      },
+    }),
+  },
+});
+
+const authz = createAuthz({ model, store: memoryStore() });
+```
+
+## The tree
+
+```ts
+await authz.write([
+  { subject: 'user:ada', relation: 'member', resource: 'team:platform' },
+
+  { subject: 'team:platform#member', relation: 'owner', resource: 'folder:root' },
+  { subject: 'folder:root', relation: 'parent', resource: 'folder:engineering' },
+  { subject: 'folder:engineering', relation: 'parent', resource: 'document:api' },
+]);
+```
+
+Ada owns `folder:root` through her team, so she reads and writes everything three
+edges below it — including a document that names nobody.
+
+```ts
+await authz.can('user:ada', 'document.read', 'document:api'); // true  — four edges down
+await authz.can('user:bob', 'document.read', 'document:api'); // false
+```
+
+## The direction of a parent tuple
+
+<Callout type="caution" title="A relation is a property of its resource">
+`{ subject: 'folder:engineering', relation: 'parent', resource: 'document:api' }`
+reads "document:api's parent is folder:engineering". The **parent is the subject**.
+</Callout>
+
+This is the single most common mistake with this model. Write-time validation
+rejects the reverse, but it is still the first thing to check when inheritance does
+not work.
+
+## Inheritance does not leak upward
+
+```ts
+await authz.can('user:ada', 'folder.read', 'folder:engineering'); // false
+```
+
+`folder.engineering`'s `read` is its own `owner` plus its parent's — a descendant
+grant does not reach up. If you need that, it is a different edge.
+
+## Write needs ownership, inherited or direct
+
+```ts
+write: permission.allOf('owner', ttu('parent', 'write')),
+```
+
+Ada can write `document:api` because she owns the folder chain, and cannot write
+someone else's document in a folder she merely reads.
+
+## A group is not its members
+
+`team:platform#member` grants to the people in the team. `team:platform` — the
+object itself — inherits nothing:
+
+```ts
+await authz.can('team:platform', 'folder.read', 'folder:root'); // false
+```
+
+A subject never inherits through an object it merely is.
+
+## Listing what you can see
+
+```ts
+const { resources, truncated } = await authz.listResources({
+  subject: 'user:ada',
+  permission: 'document.read',
+});
+```
+
+Inheritance is included, so a document four edges below an ancestor the user owns
+appears in the list without your knowing a folder was involved. Pass `truncated`
+through to the UI rather than dropping it.
+
+## Two ways to reach an ancestor
+
+There is a `through` userset edge, and there is a tuple-to-userset. They are
+cousins, not mirrors, and both recurse into the tuple's **subject**:
+
+| | subject | recurse into |
+| --- | --- | --- |
+| userset | a group, `team:eng#member` | `team:eng`, under the relation the userset named |
+| `ttu` | a plain object, `folder:9` | `folder:9`, under `target` |
+
+The trap is assuming `ttu` mirrors the userset edge and recursing on the
+*resource* instead. That walks back up the edge, re-tests the object the walk
+started from, and denies every real grant — while looking like a traversal that
+simply never matches.
+
+## Next
+
+- [Multi-tenancy](/recipes/multi-tenancy) — isolation without an `org_id` column.
+- [Debugging](/recipes/debugging) — when the answer is wrong, ask why.

@@ -23,3 +23,11 @@ pnpm-debug.log*
 # store fixtures written by examples/tests
 *.tsbouncer.local.json
 .tmp/
+
+# docs site build output and the snippet checker's scratch directory
+docs/dist/
+docs/.astro/
+.snippet-check-*/
+
+# browser-tool scratch
+.playwright-mcp/

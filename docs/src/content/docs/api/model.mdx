@@ -1,0 +1,179 @@
+---
+title: Model builders
+description: defineModel, defineType, relation, permission, ttu, wildcard, and defineCondition.
+section: Reference
+order: 21
+kind: reference
+---
+
+import Callout from '~/components/Callout.astro';
+
+The builders, in scope for every example on this page:
+
+```ts setup
+import type { SetExpression } from 'tsbouncer';
+import {
+  createAuthz,
+  defineCondition,
+  defineModel,
+  defineType,
+  memoryStore,
+  permission,
+  relation,
+  ttu,
+  wildcard,
+} from 'tsbouncer';
+
+const store = memoryStore();
+```
+
+## defineModel
+
+```ts ts-skip
+defineModel<C extends ModelConfig>(config: C): Model
+```
+
+Validates immediately and throws `ModelDefinitionError` on: no types, a name that
+is not `[a-z_][a-z0-9_]*`, a condition registered under a different name, a
+relation and permission sharing a name, a cross-type reference to a relation that
+does not exist, or a cycle the validator can see.
+
+```ts
+const model = defineModel({
+  types: { /* … */ },
+  conditions: { /* … */ },
+});
+```
+
+The generic parameter is load-bearing: it is what makes `PermissionOf<typeof model>`
+yield literal permission names rather than `string`. Do not annotate the result
+with a wider type.
+
+## defineType
+
+```ts ts-skip
+defineType<const C extends TypeConfig = TypeConfig>(config?: C): C
+```
+
+Identity at runtime. The generic is the point — it preserves the literal config so
+the type-level derivations can see the relation and permission names.
+
+```ts
+user: defineType({}),                                  // no relations, no permissions
+team: defineType({ relations: { member: relation(['user']) } }),
+doc: defineType({
+  relations: { owner: relation(['user']) },
+  permissions: { read: permission.or('owner') },
+}),
+```
+
+## relation
+
+```ts ts-skip
+relation(type: string | readonly string[], options?: { through?: string }): SetExpression
+```
+
+Declares an edge tuples may be written against.
+
+```ts
+const one: SetExpression = relation('user');
+const several: SetExpression = relation(['user', 'team']);
+const userset: SetExpression = relation('team', { through: 'member' });
+void [one, several, userset];
+```
+
+## wildcard
+
+```ts ts-skip
+wildcard(type: string): SetExpression
+```
+
+Declares that a relation accepts a `type:*` subject. It is a *write-side*
+declaration: the relation grants nobody until a tuple exists.
+
+## ttu
+
+```ts ts-skip
+ttu(through: string, target: string): SetExpression
+```
+
+"Follow `through`, then take `target` over there." This is how a permission
+inherits — a userset edge names a relation, and `target` is usually a permission.
+
+```ts
+folder: defineType({
+  relations: { viewer: relation('user'), parent: relation('folder') },
+  permissions: { read: permission.or('viewer', ttu('parent', 'read')) },
+});
+```
+
+## permission
+
+```ts ts-skip
+permission.or(...children): SetExpression
+permission.allOf(...children): SetExpression
+```
+
+`Child` is a relation name or another `SetExpression`, so expressions nest.
+
+```ts
+permissions: {
+  read: permission.or('owner', 'editor', ttu('parent', 'read')),
+  write: permission.allOf('owner', 'editor'),
+  admin: permission.allOf(permission.or('owner', 'admin'), 'active'),
+}
+```
+
+`SetExpression` also carries fluent `or`, `and`, and `except`:
+
+```ts
+viewer: relation('user')
+  .or(relation('team', { through: 'member' }))
+  .or(relation('role', { through: 'holder' }))
+  .or(wildcard('user'));
+```
+
+<Callout type="caution" title="except takes one relation at a time">
+`SetExpression.except(subtract: Child)` accepts a single child. Writing
+`.except('a', 'b')` is a type error, and at runtime the second argument is
+silently dropped — chain instead: `.except('a').except('b')`. This is the one
+place in the fluent API where passing an extra argument degrades quietly.
+</Callout>
+
+## defineCondition
+
+```ts ts-skip
+defineCondition(
+  name: string,
+  predicate: (context: ConditionContext) => boolean,
+  options?: { params?: Record<string, 'string' | 'number' | 'boolean'> },
+): ConditionDef
+```
+
+The predicate is code in the model; only the name and the bound parameters live on
+the tuple.
+
+```ts
+sameRegion: defineCondition(
+  'sameRegion',
+  (ctx) => {
+    const { region, callerRegion } = ctx;
+    if (typeof region !== 'string' || typeof callerRegion !== 'string') return false;
+    return region === callerRegion;
+  },
+  { params: { region: 'string' as const } },
+);
+```
+
+<Callout type="caution" title="The context is untyped, and that is not an oversight — yet">
+`ConditionContext` is `{ [key: string]: unknown }`, so a predicate must narrow
+every key it reads, including ones it declared. `params` governs *write-time
+validation* of what a tuple may bind; it does not type the predicate. This is the
+sharpest ergonomic edge in the API today and is a known gap, not a design
+decision. See [Conditions](/concepts/conditions#narrowing).
+</Callout>
+
+## Next
+
+- [API: types](/api/types) — deriving checked strings from the model.
+- [API: errors](/api/errors)

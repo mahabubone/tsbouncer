@@ -1,0 +1,167 @@
+---
+title: Data
+description: The tuple format, opaque references, and what write-time validation catches for you.
+section: Concepts
+order: 11
+kind: guide
+---
+
+import Callout from '~/components/Callout.astro';
+
+## Tuples
+
+A tuple is one edge: *this subject holds this relation on this resource*.
+
+```ts setup
+import {
+  createAuthz,
+  defineModel,
+  defineType,
+  memoryStore,
+  permission,
+  relation,
+} from 'tsbouncer';
+
+const model = defineModel({
+  types: {
+    user: defineType({}),
+    team: defineType({ relations: { member: relation(['user']) } }),
+    document: defineType({
+      relations: {
+        owner: relation(['user']),
+        editor: relation('user').or(relation('team', { through: 'member' })),
+      },
+      permissions: { read: permission.or('owner', 'editor') },
+    }),
+  },
+});
+
+const authz = createAuthz({ model, store: memoryStore() });
+```
+
+```ts
+await authz.write([
+  { subject: 'user:alice', relation: 'owner', resource: 'document:1' },
+  { subject: 'user:alice', relation: 'member', resource: 'team:eng' },
+  { subject: 'team:eng#member', relation: 'editor', resource: 'document:2' },
+]);
+```
+
+They are plain objects with no methods and no class instances, so they serialize
+to JSON, diff in a pull request, and seed from a fixture without any special
+handling.
+
+## References
+
+A reference is an opaque string with three forms:
+
+| form | meaning |
+| --- | --- |
+| `user:alice` | the object `alice` of type `user` |
+| `team:eng#member` | the set of members of `team:eng` — a *userset* |
+| `user:*` | every subject of type `user` |
+
+`tsbouncer` never resolves `user:alice` to a row in your `users` table, and never
+needs a foreign key into your domain schema. What a reference *means* is entirely
+your application's business.
+
+<Callout type="caution" title="A relation is a property of its resource">
+`{ subject: 'folder:backend', relation: 'parent', resource: 'document:api' }` reads
+"document:api's parent is folder:backend". The parent is the subject. Write-time
+validation rejects the reverse, but it is still the most common mistake with this
+model.
+</Callout>
+
+## Writing
+
+```ts
+await authz.grant({ subject: 'user:alice', relation: 'owner', resource: 'document:1' });
+
+await authz.write([
+  { subject: 'user:bob', relation: 'viewer', resource: 'document:1' },
+  { subject: 'user:carol', relation: 'viewer', resource: 'document:1' },
+]);
+```
+
+`write` takes a second argument:
+
+```ts
+const seed = [{ subject: 'user:bob', relation: 'owner', resource: 'document:1' }];
+
+await authz.write(seed, 'insert'); // the default: reject duplicates
+await authz.write(seed, 'upsert'); // replace tuples that share a key
+```
+
+Use `insert` in a seed script. A fixture that silently overwrites passes on a
+machine where the data already existed and fails everywhere else.
+
+## Removing
+
+```ts
+await authz.revoke({ subject: 'user:bob', relation: 'viewer', resource: 'document:1' });
+
+await authz.delete({
+  kind: 'tuples',
+  tuples: [{ subject: 'user:bob', relation: 'viewer', resource: 'document:1' }],
+});
+await authz.delete({ kind: 'filter', query: { resource: 'document:1' } });
+await authz.delete({
+  kind: 'replace',
+  query: { resource: 'document:1' },
+  tuples: [{ subject: 'user:dave', relation: 'owner', resource: 'document:1' }],
+});
+```
+
+`replace` swaps everything scoped by the query for the new tuples, and stores that
+support it apply it as one all-or-nothing unit.
+
+## Write-time validation
+
+Every write is checked against the model before it is stored. This is the highest
+value-per-line behaviour in the library: a typo fails where it is still cheap,
+rather than silently denying forever.
+
+```ts
+await authz.write([{ subject: 'user:alice', relation: 'viewe', resource: 'document:1' }]);
+// TupleValidationError: relation "viewe" on "document" does not exist
+```
+
+```ts
+await authz.write([{ subject: 'user:carol', relation: 'owner', resource: 'document:1' }]);
+// TupleValidationError: relation "owner" on "document" does not accept a "team" subject
+```
+
+Validation can be turned off, and there is exactly one good reason to: replaying
+data that a previous version of the model accepted, before you migrate it.
+
+```ts
+const lenient = createAuthz({ model, store: memoryStore(), validate: false });
+await lenient.write([{ subject: 'user:alice', relation: 'owner', resource: 'document:1' }]);
+```
+
+## Reading tuples back
+
+The store is readable, and one filtered read is the whole primitive.
+
+```ts
+const { items, cursor } = await authz.store.read({ resource: 'document:1', limit: 100 });
+const mine = await authz.store.read({ subject: 'user:alice' });
+```
+
+`'user:*'` is a legal filter, so "everything anyone can see" is a query rather
+than a scan:
+
+```ts
+const publicDocs = await authz.store.read({ subject: 'user:*' });
+```
+
+Filters are conjunctive: any subset of subject, relation, and resource. A
+reference spans several columns, so `subject: ['user:alice', 'user:bob']` is
+implemented as an OR of per-reference ANDs — it can never match a userset row by
+pairing one reference's type with another's id.
+
+## Next
+
+- [Conditions](/concepts/conditions) — binding constraints to a grant.
+- [Queries](/concepts/queries) — the three whole-graph reads.
+- [Stores](/concepts/stores) — what the contract guarantees.

@@ -10,19 +10,22 @@
     "node": ">=20.11"
   },
   "scripts": {
-    "build": "turbo run build",
-    "typecheck": "turbo run typecheck",
-    "test": "turbo run test",
+    "build": "turbo run build --filter=!tsbouncer-docs",
+    "typecheck": "turbo run typecheck --filter=!tsbouncer-docs",
+    "test": "turbo run test --filter=!tsbouncer-docs",
     "test:watch": "vitest --root packages/core",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "pack:check": "turbo run pack:check",
+    "pack:check": "turbo run pack:check --filter=!tsbouncer-docs",
     "check": "pnpm lint && pnpm versions && pnpm typecheck && pnpm build && pnpm pack:check && pnpm test:coverage && pnpm examples",
-    "test:coverage": "turbo run test:coverage",
+    "test:coverage": "turbo run test:coverage --filter=!tsbouncer-docs",
     "coverage": "turbo run test:coverage",
     "examples": "turbo run start",
-    "versions": "node scripts/check-versions.mjs"
+    "versions": "node scripts/check-versions.mjs",
+    "docs:dev": "pnpm --filter tsbouncer-docs dev",
+    "docs:build": "pnpm --filter tsbouncer-docs build",
+    "docs:test": "pnpm --filter tsbouncer-docs test"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",

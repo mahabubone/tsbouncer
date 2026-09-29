@@ -1,0 +1,122 @@
+---
+title: Getting started
+description: Install it, declare a model, and answer one question about one document.
+order: 1
+kind: guide
+---
+
+import Callout from '~/components/Callout.astro';
+
+## Install
+
+```bash
+npm i tsbouncer                    # batteries-included
+npm i @tsbouncer/core              # the kernel, zero dependencies
+npm i @tsbouncer/kysely            # or drizzle / prisma, over your own client
+```
+
+`tsbouncer` re-exports the kernel plus the two stores that need no external
+dependency. If you already have Kysely, Drizzle, or Prisma, import `@tsbouncer/core`
+and the matching store — the batteries-included package deliberately does not
+depend on any of them, and neither should your install graph because you read a
+README.
+
+ESM only. There is no CommonJS build, and `require()` will not work. Node 20.11 or
+newer.
+
+## Declare a model
+
+The model is code, validated at runtime when `defineModel` is called. A relation
+that names a type which does not exist throws immediately, not on the first
+request that happens to use it.
+
+```ts
+import { defineModel, defineType, permission, relation } from 'tsbouncer';
+
+const model = defineModel({
+  types: {
+    user: defineType({}),
+    team: defineType({ relations: { member: relation(['user']) } }),
+    document: defineType({
+      relations: {
+        owner: relation(['user']),
+        editor: relation('user').or(relation('team', { through: 'member' })),
+      },
+      permissions: {
+        read: permission.or('owner', 'editor'),
+      },
+    }),
+  },
+});
+```
+
+## Connect a store
+
+```ts
+import { createAuthz, memoryStore } from 'tsbouncer';
+
+const authz = createAuthz({ model, store: memoryStore() });
+```
+
+`memoryStore` is process-local and is the right choice for tests. For anything
+else, see [Stores](/concepts/stores).
+
+## Write and ask
+
+```ts
+await authz.write([
+  { subject: 'user:alice', relation: 'owner', resource: 'document:1' },
+  { subject: 'team:eng#member', relation: 'editor', resource: 'document:2' },
+  { subject: 'user:alice', relation: 'member', resource: 'team:eng' },
+]);
+
+await authz.can('user:alice', 'document.read', 'document:1'); // true  — owner
+await authz.can('user:alice', 'document.read', 'document:2'); // true  — team member
+await authz.can('user:bob', 'document.read', 'document:2'); // false — not a member
+```
+
+Three calls, and the third one is the interesting one: alice's access to
+`document:2` comes from a membership tuple and a userset edge, not from a tuple
+that names her on the document.
+
+## Use it from a route
+
+The library has no opinion about your framework, so this is the whole
+integration:
+
+```ts ts-skip
+import { isAuthorizationError } from 'tsbouncer';
+
+app.get('/api/documents/:id', async (req, res) => {
+  const subject = `user:${req.header('x-user-id')}`;
+
+  try {
+    await authz.assert({
+      subject,
+      permission: 'document.read',
+      resource: `document:${req.params.id}`,
+    });
+  } catch (error) {
+    if (isAuthorizationError(error)) {
+      res.status(403).json({ error: 'forbidden' });
+      return;
+    }
+    throw error; // a store or model failure is NOT a denial
+  }
+
+  res.json(await loadDocument(req.params.id));
+});
+```
+
+<Callout type="caution" title="A denied check and a broken check are different events">
+`isAuthorizationError` is true for a *denied check* and also for a *rejected
+write*. Mapping both to 403 is how a typo in a request body reports itself to the
+user as "you are not allowed", with nothing in the logs to say the server is at
+fault. Branch on `error.code` — see [Errors](/api/errors).
+</Callout>
+
+## Next
+
+- [The model](/concepts/model) — every shape the evaluator understands.
+- [Data](/concepts/data) — the reference format, and what write-time validation catches.
+- [HTTP integration](/recipes/http) — Express, Hono, Fastify, and where to put the check.

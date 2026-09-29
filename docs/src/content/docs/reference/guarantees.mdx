@@ -1,0 +1,92 @@
+---
+title: Guarantees
+description: What this library claims, checked on every build. A ✗ means the claim is not currently true.
+section: Reference
+order: 40
+kind: guide
+---
+
+import Callout from '~/components/Callout.astro';
+
+Every line below is a clause in a contract, run against a real store on every CI
+build. The report is uploaded as an artifact; this page is the same list.
+
+The value is not the re-testing — the unit suite does that. It is that each clause
+states its rule in a sentence, so the claim is answerable without reading the
+evaluator. A clause that *throws* fails, because a contract that treats a crash as
+a pass reports green on a broken library.
+
+## Engine
+
+| | guarantee | expected |
+| --- | --- | --- |
+| ✓ | `direct-grant` | a direct grant allows the subject that holds it |
+| ✓ | `direct-denied-for-others` | a grant grants nobody else |
+| ✓ | `userset-rewrites` | membership in a group carries the group's grant |
+| ✓ | `a-group-is-not-its-members` | naming a group grants the group object, not the people in it |
+| ✓ | `wildcard-covers-every-subject` | a wildcard grant reaches every subject of that type |
+| ✓ | `exclusion-beats-a-satisfied-base` | an exclusion removes an access its own base granted |
+| ✓ | `exclusion-does-not-leak-to-other-permissions` | an exclusion on `write` leaves `read` alone |
+| ✓ | `declared-wildcard-is-not-a-grant` | declaring a wildcard edge is not banning everyone |
+| ✓ | `inheritance-follows-the-parent-chain` | permission flows from an ancestor to its descendants |
+| ✓ | `inheritance-does-not-leak-upward` | a descendant grant does not reach the ancestor |
+| ✓ | `the-tuple-is-authoritative-over-the-request` | the writer's binding wins on a conflict |
+| ✓ | `a-condition-without-its-context-denies` | a missing key is a denial, never a pass |
+| ✓ | `an-undeclared-condition-denies` | an unrecognised condition is a denial |
+| ✓ | `a-cycle-terminates` | evaluation terminates rather than hanging, and denies |
+| ✓ | `list-and-check-agree` | the list query and the single check never contradict |
+| ✓ | `the-list-queries-honour-context` | `listResources` applies the caller context |
+| ✓ | `a-denied-decision-is-explainable` | a denial cites tuples or the query that came back empty |
+| ✓ | `explain-cites-a-granting-tuple` | the trace names the tuple that granted it |
+| ✓ | `a-malformed-tuple-is-rejected-at-write` | a bad grant fails at write time |
+| ✓ | `a-store-that-matches-too-much-is-detectable` | an over-matching store is rejected |
+| ✓ | `a-store-that-drops-conditions-is-detectable` | a fail-open store is caught |
+
+## Store
+
+| | guarantee | expected |
+| --- | --- | --- |
+| ✓ | `filtered-read` | a correct store reproduces the recorded answers exactly |
+| ✓ | `an-over-matching-store-is-rejected` | it must not reproduce the reference answers |
+| ✓ | `a-condition-stripping-store-is-rejected` | a store that drops bindings must be caught |
+| ✓ | `the-dataset-covers-every-shape` | equivalence is proven for more than the easy cases |
+
+## What is *not* guaranteed
+
+The guarantees above are only as good as what is actually exercised, and three
+things are not:
+
+<Callout type="warning" title="Postgres and MySQL are untested">
+The SQL adapters declare `sqlite | postgres | mysql`. CI runs SQLite and libsql
+only. So adapter interchangeability is proven across *query builders* and not
+across *databases* — and the dialect is where `insert` versus `upsert` diverges.
+</Callout>
+
+<Callout type="warning" title="listResources is O(store size) in the worst case">
+Finding resources granted through a group requires reading the whole table, because
+the store contract has no index for userset subjects. The budget bounds it, so the
+answer is partial rather than the process hanging — but a large table returns
+`truncated: true` more often than you want. See [Stores](/concepts/stores).
+</Callout>
+
+<Callout type="caution" title="Condition contexts are untyped">
+`ConditionContext` is `{ [key: string]: unknown }`, so every predicate must narrow
+every key it reads, including ones it declared in `params`. It is the sharpest
+ergonomic edge in the API and is being fixed; the workaround is documented on
+[Conditions](/concepts/conditions#narrowing).
+</Callout>
+
+## Why this exists
+
+A test suite says "this input produced this output", and a reader has to read the
+body to learn what rule was being checked. For a library whose whole pitch is a
+list of guarantees, that list should be readable on its own.
+
+The contract runner is not a test framework — no discovery, no fixtures, no
+mocking, no lifecycle. It is a shape for expectations plus a runner and a
+formatter, so a guarantee can be written once and reported on.
+
+## Next
+
+- [Testing](/recipes/testing) — the conformance suite every store must pass.
+- [Conditions](/concepts/conditions)

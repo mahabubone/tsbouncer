@@ -2,6 +2,7 @@ packages:
   - 'packages/*'
   - 'packages/stores/*'
   - 'examples/*'
+  - 'docs'
 
 allowBuilds:
   '@prisma/client': true

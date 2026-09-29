@@ -1,0 +1,34 @@
+{
+  "name": "tsbouncer-docs",
+  "private": true,
+  "version": "1.0.0-dev.0",
+  "type": "module",
+  "description": "Documentation site for tsbouncer.",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "astro": "7.3.5",
+    "@astrojs/mdx": "8.0.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "@tsbouncer/core": "workspace:*",
+    "@tsbouncer/kysely": "workspace:*",
+    "@tsbouncer/testkit": "workspace:*",
+    "@types/node": "24.10.1",
+    "kysely": "0.29.6",
+    "tailwindcss": "4.3.3",
+    "tsbouncer": "workspace:*",
+    "typescript": "5.9.3",
+    "vitest": "5.0.2"
+  }
+}

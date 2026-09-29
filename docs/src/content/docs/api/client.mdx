@@ -1,0 +1,232 @@
+---
+title: Client
+description: Every method on the object createAuthz returns, and which one to reach for.
+section: Reference
+order: 20
+kind: reference
+---
+
+import Callout from '~/components/Callout.astro';
+
+`createAuthz({ model, store })` returns the only object you need to hold. Every
+example on this page runs against this setup:
+
+```ts setup
+import {
+  createAuthz,
+  defineModel,
+  defineType,
+  isAuthorizationError,
+  memoryStore,
+  permission,
+  relation,
+} from 'tsbouncer';
+import type { EvaluationLimits, Model, TupleStore } from 'tsbouncer';
+
+const model = defineModel({
+  types: {
+    user: defineType({}),
+    document: defineType({
+      relations: { owner: relation(['user']) },
+      permissions: { read: permission.or('owner') },
+    }),
+  },
+});
+
+const store: TupleStore = memoryStore();
+const authz = createAuthz({ model, store });
+```
+
+```ts
+interface CreateAuthzOptions {
+  model: Model;
+  store: TupleStore;
+  limits?: Partial<EvaluationLimits>;
+  validate?: boolean; // default true
+}
+```
+
+## createAuthz
+
+```ts ts-skip
+createAuthz({ model, store, limits, validate }): Authz
+```
+
+Validates the store's shape immediately, so a malformed store fails at
+construction rather than on the first read. `limits` caps depth, node count, and
+wall-clock time per evaluation; `validate` turns write-time model validation off,
+and the only good reason to is replaying data written under a previous model.
+
+## Deciding
+
+### can
+
+```ts ts-skip
+can(subject, permission, resource, options?): Promise<boolean>
+```
+
+The boolean form. `options` accepts the same `context` as everything else, so a
+conditional permission is expressible here too.
+
+```ts
+await authz.can('user:dave', 'document.read', 'document:1', {
+  context: { callerRegion: 'eu' },
+});
+```
+
+### check
+
+```ts ts-skip
+check(request, options?): Promise<Decision>
+```
+
+The same decision with the request echoed back, which is what you want in a log
+line or an audit record.
+
+```ts
+interface Decision {
+  allowed: boolean;
+  subject: string;
+  permission: string;
+  resource: string;
+}
+```
+
+### assert
+
+```ts ts-skip
+assert(request, options?): Promise<void>
+```
+
+Throws `AccessDeniedError` when denied. Use it where a denial means the caller is
+in an invalid state and the route must not continue.
+
+```ts
+async function requireWrite(subject: string, resource: string): Promise<Response | undefined> {
+  try {
+    await authz.assert({ subject, permission: 'document.write', resource });
+  } catch (error) {
+    if (isAuthorizationError(error) && error.code === 'access_denied') {
+      return new Response('forbidden', { status: 403 });
+    }
+    throw error;
+  }
+}
+```
+
+### explain
+
+```ts ts-skip
+explain(request, options?): Promise<ExplainResult>
+```
+
+The decision *and* the reasoning. See [Queries](/concepts/queries#explain) for the
+shape of the tree.
+
+## Whole-graph reads
+
+### listResources
+
+```ts ts-skip
+listResources({ subject, permission, context? }): Promise<ResourceList>
+```
+
+Everything the subject holds `permission` on, including access inherited from a
+folder or a group.
+
+```ts
+interface ResourceList {
+  resources: readonly string[];
+  truncated: boolean;
+}
+```
+
+<Callout type="caution" title="truncated is not decoration">
+A budget that runs out mid-enumeration yields a *partial* answer. A bare array
+cannot distinguish "some of them" from "all of them", so the result is an object
+and the caller is obligated to know which they got. Pass it to the UI.
+</Callout>
+
+### listSubjects
+
+```ts ts-skip
+listSubjects({ permission, resource, context? }): Promise<SubjectSet>
+```
+
+Who holds a permission on a resource. Deliberately **not** always a concrete list:
+a grant that covers a class of subjects is reported symbolically, because
+inventing a member list would be a guess.
+
+```ts
+const { allOfTypes, members, excluded, truncated: subjectListTruncated } =
+  await authz.listSubjects({
+    permission: 'document.public',
+    resource: 'document:1',
+  });
+// allOfTypes: ['user']            "any user", not a list of users
+// members:     ['user:alice', 'team:eng#member']
+// excluded:    ['user:mallory']    the `except` side, not flattened away
+```
+
+`excluded` is populated when the base is symbolic and a named subject is carved
+out of it — "every user except mallory". A concrete set that subtracts to empty is
+simply empty.
+
+### expand
+
+```ts ts-skip
+expand({ subject }): Promise<ExpandResult>
+```
+
+Every concrete subject a userset contains, transitively. A wildcard expands to
+itself rather than to an invented list.
+
+```ts
+const { subjects, truncated } = await authz.expand({ subject: 'team:eng#member' });
+```
+
+## Writing
+
+```ts ts-skip
+grant(input: GrantInput): Promise<void>
+write(tuples: readonly Tuple[], mode?: 'insert' | 'upsert'): Promise<void>
+revoke(input: GrantInput): Promise<void>
+delete(input: DeleteInput): Promise<void>
+```
+
+## Scoping to a transaction
+
+```ts ts-skip
+withStore(store: TupleStore): Authz
+```
+
+Returns a client bound to another store — typically a transaction handle. The
+per-request memo is keyed by store identity, so results are never computed against
+the outer store and returned as if they came from the transaction.
+
+```ts
+declare function inTransaction<T>(fn: (store: TupleStore) => Promise<T>): Promise<T>;
+
+await inTransaction(async (trx) => {
+  const scoped = authz.withStore(trx);
+  await scoped.grant({ subject: 'user:alice', relation: 'owner', resource: 'document:1' });
+  // decisions made here see the write above, and nothing outside the transaction
+});
+```
+
+## Introspection
+
+```ts ts-skip
+types(): string[]
+relations(type: string): string[]
+permissions(type: string): string[]
+```
+
+For building admin UIs. A model built at runtime is not knowable from the types
+alone, and these are how you ask.
+
+## Next
+
+- [API: model builders](/api/model)
+- [API: types](/api/types) — deriving strings from the model.
+- [API: errors](/api/errors) — codes, and what they mean.

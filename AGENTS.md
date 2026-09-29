@@ -42,7 +42,12 @@ packages/stores/prisma   @tsbouncer/prisma
 packages/testkit         @tsbouncer/testkit   conformance + golden suites
 packages/tsbouncer       tsbouncer            batteries-included re-export
 examples/                runnable, verified in CI (`pnpm examples`)
+docs/                    Astro 7 docs site; every snippet is type-checked
 ```
+
+`docs/` is **not** part of the published surface and nothing in `packages/` depends
+on it. It needs Node 22 (Astro's floor) while the library supports `>=20.11`, so
+`pnpm build` and `pnpm test` filter it out and CI builds it separately.
 
 `testkit` is the primary quality gate — there is no CLI. **Any new store must pass
 the full conformance suite.** A store that does not pass is not done.

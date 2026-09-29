@@ -1,0 +1,170 @@
+---
+title: Stores
+description: The one mandatory primitive, what each adapter is for, and what is not verified.
+section: Concepts
+order: 14
+kind: guide
+---
+
+import Callout from '~/components/Callout.astro';
+
+```ts setup
+import { createAuthz } from '@tsbouncer/core';
+import { kyselyStore } from '@tsbouncer/kysely';
+import type {
+  DeleteInput,
+  Page,
+  ReadTupleQuery,
+  Tuple,
+  TupleStore,
+  WriteInput,
+} from '@tsbouncer/core';
+import type { Kysely } from 'kysely';
+import { storeConformance } from '@tsbouncer/testkit';
+
+declare const db: Kysely<unknown>;
+```
+
+## The contract
+
+One primitive is mandatory: a filtered read. Everything else — reverse walks,
+`expand`, `listResources`, `listSubjects` — is derived by the engine.
+
+```ts
+declare const contract: {
+  readonly capabilities: { atomicWrite: boolean };
+  read(query?: ReadTupleQuery): Promise<Page<Tuple>>;
+  write(input: WriteInput): Promise<void>;
+  delete(input: DeleteInput): Promise<void>;
+};
+void contract;
+```
+
+Stores move tuples. They do not evaluate conditions, resolve permissions, or
+decide anything.
+
+<Callout type="caution" title="There is deliberately no optional check() fast path">
+An earlier design let each store implement a `check()` shortcut. It was rejected:
+reimplementing wildcard, rewrite, tuple-to-userset, and exclusion semantics per
+adapter is the single most likely route to a subtly-wrong authorization library,
+and each adapter would then be correct on the cases its author thought about.
+</Callout>
+
+### Capabilities are declared, not sniffed
+
+```ts
+interface TupleStoreCapabilities {
+  atomicWrite: boolean; // writes are one all-or-nothing unit
+  persistent: boolean; // state survives process exit
+  atomicReplace: boolean; // `replace` deletes are atomic with their write
+  pagination: boolean; // `read` honours `limit` and returns a `cursor`
+  transaction: boolean; // a transaction handle can be produced
+  watch: boolean; // invalidations are emitted on change
+}
+```
+
+A store that does not support something should say so rather than pretending. A
+store that claims support and does not deliver it is a bug, and the conformance
+suite is written to catch exactly that.
+
+## Choosing one
+
+| package | takes | tested against |
+| --- | --- | --- |
+| `@tsbouncer/memory` | nothing — process-local | in-process |
+| `@tsbouncer/json` | a file path | on disk, atomic |
+| `@tsbouncer/kysely` | your `Kysely` instance | SQLite |
+| `@tsbouncer/drizzle` | your `db` and table object | SQLite (sync) and libsql (async) |
+| `@tsbouncer/prisma` | your `PrismaClient` | SQLite via Prisma 7 |
+
+`memoryStore` for tests, `jsonStore` for fixtures and local development, and one
+of the SQL adapters for anything with more than one process. Whether authorization
+state should be durable is a decision about the application, so the choice is never
+inferred from the environment.
+
+```ts
+declare const model: Parameters<typeof createAuthz>[0]['model'];
+
+const authz = createAuthz({ model, store: kyselyStore(db) });
+```
+
+The adapter ships its own DDL, so an app's migration and its authorization schema
+cannot drift apart:
+
+```ts ts-skip
+import { createTupleTableSql } from '@tsbouncer/kysely';
+
+raw.exec(createTupleTableSql('sqlite')); // 'postgres' and 'mysql' are also available
+```
+
+It is the same SQL the conformance suite runs, against a real database.
+
+<Callout type="warning" title="Postgres and MySQL are supported but not tested">
+`DIALECTS` is `sqlite | postgres | mysql`, and only SQLite and libsql are exercised
+in CI. So "switch adapters without migrating data" is verified across *query
+builders* and **not** across *databases* — and the dialect is exactly where
+`insert` versus `upsert` diverges. Treat Postgres and MySQL as untested until you
+have run the suite against them.
+</Callout>
+
+## The one table
+
+All four SQL-backed adapters share a contract, so an application can move between
+them without migrating data:
+
+`subject_type` · `subject_id` · `subject_relation` · `relation` · `resource_type` ·
+`resource_id` · `condition` · `context`
+
+A reference spans three columns, which is why each filter is a set of per-reference
+ANDs. `subject_relation` and `condition` are `''` when absent, never `NULL`: a
+unique constraint containing a `NULL` never fires in Postgres, and
+`write({ mode: 'insert' })` would silently stop rejecting duplicates.
+
+## listResources is O(store size) in the worst case
+
+Worth knowing before you put it in a hot path. Finding the resources a subject can
+read means finding tuples whose subject is a *group* — and the store contract has no
+index for "subjects that are usersets", so the engine reads the whole table and
+walks membership for each distinct group.
+
+The evaluation budget bounds it, so a huge table produces `truncated: true` rather
+than a hang. That is honest but it means the answer is partial, and a UI that
+ignores the flag will show a short list as if it were complete.
+
+```ts
+declare const session: { userId: string };
+
+const { resources, truncated } = await authz.listResources({
+  subject: `user:${session.userId}`,
+  permission: 'document.read',
+});
+if (truncated) {
+  // narrow the query, or paginate by resource type
+}
+```
+
+For a table in the tens of thousands this is fine. For a large one, scope the
+query — filter by resource type or workspace — or read your own domain table and
+call `can()` per row.
+
+## Writing your own
+
+Implement three methods and declare your capabilities. Then run the conformance
+suite from `@tsbouncer/testkit`:
+
+```ts
+declare function myStore(): TupleStore;
+
+storeConformance({
+  name: 'my-store',
+  skip: ['pagination'],
+  create: () => myStore(),
+});
+```
+
+A store that does not pass is not done. See [Testing](/recipes/testing).
+
+## Next
+
+- [Recipe: testing](/recipes/testing) — the conformance suite and the golden dataset.
+- [API: client](/api/client#scoping-to-a-transaction) — running inside a transaction.

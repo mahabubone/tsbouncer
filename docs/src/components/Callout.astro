@@ -1,0 +1,51 @@
+---
+/**
+ * A callout. Used for the things a reader must not miss: what a decision costs,
+ * what is not covered, and what will fail closed.
+ *
+ * `type="note"` is neutral, `tip` is guidance, `caution` is a trap, and `warning`
+ * is a claim that is not currently true in the library.
+ */
+export interface Props {
+  type?: 'note' | 'tip' | 'caution' | 'warning';
+  title?: string;
+}
+
+const { type = 'note', title } = Astro.props;
+
+const styles: Record<string, { box: string; label: string; glyph: string }> = {
+  note: {
+    box: 'border-[var(--border)] bg-[var(--surface-sunken)]',
+    label: 'text-[var(--text)]',
+    glyph: 'ℹ',
+  },
+  tip: {
+    box: 'border-[var(--color-flag-pass)]/40 bg-[var(--color-flag-pass)]/5',
+    label: 'text-[var(--color-flag-pass)]',
+    glyph: '✓',
+  },
+  caution: {
+    box: 'border-[var(--color-flag-warn)]/50 bg-[var(--color-flag-warn)]/5',
+    label: 'text-[var(--color-flag-warn)]',
+    glyph: '!',
+  },
+  warning: {
+    box: 'border-[var(--color-flag-fail)]/50 bg-[var(--color-flag-fail)]/5',
+    label: 'text-[var(--color-flag-fail)]',
+    glyph: '✗',
+  },
+};
+
+const s = styles[type] ?? styles.note;
+const heading = title ?? type;
+---
+
+<aside class={`rounded-[var(--radius-card)] border p-4 text-[0.9375rem] ${s.box}`}>
+  <p class={`mb-1.5 flex items-center gap-2 font-semibold ${s.label}`}>
+    <span aria-hidden="true">{s.glyph}</span>
+    {heading}
+  </p>
+  <div class="text-[var(--text-muted)] [&>*+*]:mt-2 [&_code]:whitespace-normal">
+    <slot />
+  </div>
+</aside>

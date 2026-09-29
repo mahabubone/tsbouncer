@@ -84,3 +84,43 @@ jobs:
           path: 'packages/testkit/coverage/contract/report.md'
           include-hidden-files: true
           if-no-files-found: error
+
+  docs:
+    name: docs
+    # Astro 7 requires Node 22. The library publishes `engines: >=20.11`, and the
+    # docs toolchain must not drag that floor up — so this is a separate job on a
+    # separate runtime rather than a change to the main one.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the library
+        # The docs type-check their snippets against the *built* package, so a
+        # snippet using an API that does not exist fails here rather than in a
+        # reader's terminal.
+        run: pnpm build
+
+      - name: Check every documentation snippet
+        run: pnpm docs:test
+
+      - name: Build the site
+        run: pnpm docs:build
+
+      - name: Upload the built site
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-site
+          path: 'docs/dist'
+          include-hidden-files: true

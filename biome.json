@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!**/dist", "!**/coverage", "!**/node_modules"]
+    "includes": ["**", "!**/dist", "!**/coverage", "!**/node_modules", "!**/*.astro"]
   },
   "formatter": {
     "enabled": true,
@@ -61,6 +61,16 @@
           }
         }
       }
+    },
+    {
+      "includes": ["docs/**/*.css"],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noImportantStyles": "off"
+          }
+        }
+      }
     }
   ],
   "javascript": {
@@ -69,6 +79,11 @@
       "trailingCommas": "all",
       "semicolons": "always",
       "arrowParentheses": "always"
+    }
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
     }
   }
 }

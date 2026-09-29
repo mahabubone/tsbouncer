@@ -1,0 +1,156 @@
+---
+title: Introduction
+description: One model, one set of tuples, one evaluator — over storage your application already has.
+order: 0
+kind: guide
+status: preview
+---
+
+import Callout from '~/components/Callout.astro';
+
+## The whole library in one file
+
+A model says what a *shape* of access is. Data says who holds it. The engine is
+what connects them.
+
+```ts setup
+import {
+  createAuthz,
+  defineModel,
+  defineType,
+  memoryStore,
+  permission,
+  relation,
+  wildcard,
+} from 'tsbouncer';
+
+const model = defineModel({
+  types: {
+    user: defineType({}),
+    team: defineType({ relations: { member: relation(['user']) } }),
+    document: defineType({
+      relations: {
+        owner: relation(['user']),
+        editor: relation('user').or(relation('team', { through: 'member' })),
+        banned: relation('user').or(wildcard('user')),
+      },
+      permissions: {
+        read: permission.or('owner', 'editor'),
+        write: permission.allOf('owner', 'editor').except('banned'),
+      },
+    }),
+  },
+});
+
+const authz = createAuthz({ model, store: memoryStore() });
+```
+
+Everything below is that same `authz`.
+
+<Callout type="note" title="This page is checked, not written">
+Every TypeScript block on this site is extracted and type-checked against the
+built package on every build. A snippet that stops compiling fails the build. If
+you find a snippet that does not work, that is a bug in the library rather than in
+your copy of it — please report it.
+</Callout>
+
+## Writing data
+
+Tuples are the access data. They are plain objects, so they serialize, diff, and
+seed without any special handling.
+
+```ts
+await authz.grant({ subject: 'user:alice', relation: 'owner', resource: 'document:1' });
+await authz.grant({ subject: 'team:eng#member', relation: 'editor', resource: 'document:2' });
+
+await authz.can('user:alice', 'document.read', 'document:1'); // true
+await authz.can('user:bob', 'document.read', 'document:2'); // false — not a member
+```
+
+A tuple is rejected at write time if it names a relation the model does not
+declare, so a typo fails where it is still cheap rather than denying forever.
+
+## The decision
+
+```ts
+const decision = await authz.check({
+  subject: 'user:alice',
+  permission: 'document.read',
+  resource: 'document:1',
+});
+
+async function serve(subject: string, resource: string): Promise<Response> {
+  if (!decision.allowed) return new Response('forbidden', { status: 403 });
+  return new Response('ok');
+}
+```
+
+Or a boolean, if a denial is a normal outcome rather than a bug:
+
+```ts
+const allowed = await authz.can('user:alice', 'document.read', 'document:1');
+```
+
+Or an exception, if the route must not serve this user at all:
+
+```ts
+await authz.assert({ subject: 'user:alice', permission: 'document.write', resource: 'document:1' });
+```
+
+Or the reason, which is the one nobody expects to need and everybody ends up
+needing:
+
+```ts
+import { formatExplain } from 'tsbouncer';
+
+const result = await authz.explain({
+  subject: 'user:bob',
+  permission: 'document.read',
+  resource: 'document:2',
+});
+
+if (!result.allowed) console.log(formatExplain(result));
+```
+
+```
+DENIED  user:bob -> document:2#document.read
+  - union
+    - owner
+      - direct
+        no matching tuples
+    - editor
+      + userset
+        team:eng#member#editor@document:2
+        - direct
+          no matching tuples
+  (4 reads)
+```
+
+Every leaf cites either the tuples that produced it or the query that came back
+empty. The tree is plain JSON, so the same call can feed a support UI, a test, or
+a log line.
+
+## What it is not
+
+This is the part that matters more than the feature list. `tsbouncer` provides
+**no** framework middleware, **no** HTTP layer, **no** authentication, **no**
+sessions, and **no** JWT or OAuth handling.
+
+Your application owns the request lifecycle, the transaction, and the business
+logic. `tsbouncer` owns authorization semantics and access to authorization data.
+
+<Callout type="tip" title="Why that boundary is worth the effort">
+A library that ships middleware has chosen your call sites. An app with a REST
+endpoint, a GraphQL resolver, and a queue consumer rarely wants the same wrapper
+three times — so you end up writing it anyway, and now you also maintain the
+library's copy.
+</Callout>
+
+## Where to go next
+
+- [Getting started](/getting-started) — install it and answer one question.
+- [The model](/concepts/model) — every shape the evaluator understands.
+- [Stores](/concepts/stores) — choosing one, and what the contract actually says.
+- [Recipes](/recipes/rbac) — RBAC, ReBAC, ABAC, multi-tenancy, and wiring it into
+  a real app.
+- [Guarantees](/reference/guarantees) — the claims, checked on every build.
