@@ -228,6 +228,70 @@ const path = Astro.url.pathname;
         const open = sidebar?.classList.toggle('hidden') === false;
         toggle.setAttribute('aria-expanded', String(open));
       });
+
+      /*
+       * Copy buttons, delegated from the document.
+       *
+       * The buttons are rendered `hidden` by the rehype plugin and revealed here,
+       * so a reader without JavaScript is never shown a control that does nothing.
+       * Delegated rather than bound per element because a code block can have a
+       * dozen siblings and this site is static HTML — there is no framework to
+       * re-bind on.
+       */
+      for (const button of document.querySelectorAll('[data-copy]')) {
+        button.removeAttribute('hidden');
+        button.addEventListener('click', async () => {
+          const code = button.closest('.code-block')?.querySelector('code');
+          if (!code?.textContent) return;
+
+          try {
+            await navigator.clipboard.writeText(code.textContent);
+            button.textContent = 'Copied';
+            button.setAttribute('data-copied', '');
+          } catch {
+            // Clipboard access can be refused; say so rather than pretending.
+            button.textContent = 'Press Ctrl+C';
+          }
+
+          setTimeout(() => {
+            button.textContent = 'Copy';
+            button.removeAttribute('data-copied');
+          }, 2000);
+        });
+      }
+
+      /*
+       * Mark the code blocks that actually scroll, on either axis, so the edge
+       * fades can appear. Overlay scrollbars reserve no space, so a capped block
+       * is otherwise indistinguishable from a snippet that was cut off.
+       *
+       * Measured once on load, again on resize, and on scroll for the end state.
+       */
+      const syncScrollHints = () => {
+        for (const block of document.querySelectorAll('.code-block')) {
+          const pre = block.querySelector('pre');
+          if (!pre) continue;
+
+          const slack = 2;
+          const overflowY = pre.scrollHeight - pre.clientHeight > slack;
+          const overflowX = pre.scrollWidth - pre.clientWidth > slack;
+
+          block.dataset.scrollableY = String(overflowY);
+          block.dataset.scrollableX = String(overflowX);
+          block.dataset.scrolledToEnd = String(
+            !overflowY || pre.scrollTop >= pre.scrollHeight - pre.clientHeight - slack,
+          );
+          block.dataset.scrolledToEndX = String(
+            !overflowX || pre.scrollLeft >= pre.scrollWidth - pre.clientWidth - slack,
+          );
+        }
+      };
+
+      syncScrollHints();
+      for (const pre of document.querySelectorAll('.code-block pre')) {
+        pre.addEventListener('scroll', syncScrollHints, { passive: true });
+      }
+      addEventListener('resize', syncScrollHints, { passive: true });
     </script>
   </body>
 </html>
