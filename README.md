@@ -5,9 +5,11 @@
 Define authorization data, relationships, and policies. `tsbouncer` evaluates access
 — over pluggable storage, inside your application.
 
-> **Status: pre-alpha.** Nothing is published yet. The model, the store contract, five
-> stores, a complete check engine, a batteries-included package, and the three graph
-> queries are built and tested. See [PLAN.md](./PLAN.md) for the breakdown.
+> **Status: preview.** Nothing is published yet — `1.0.0-preview.1` is
+> staged. One `tsbouncer` package (kernel plus `memory`/`json`/`defaults`
+> subpaths), three SQL store plugins, the conformance suite, a complete check
+> engine, and the three graph queries are built and tested. See
+> [PLAN.md](./PLAN.md) for the breakdown.
 
 ## Why
 
@@ -57,11 +59,12 @@ const model = defineModel({
       relations: {
         owner: relation(["user"]),
         editor: relation("user").or(relation("team", { through: "member" })),
-        parent: relation("folder"),
+        viewer: relation(["user"]),
+        banned: relation(["user"]),
       },
       permissions: {
-        read: permission.or(["owner", "editor", "viewer"]),
-        write: permission.allOf(["owner", "editor"]).except("banned"),
+        read: permission.or("owner", "editor", "viewer"),
+        write: permission.allOf("owner", "editor").except("banned"),
       },
     }),
   },
@@ -137,10 +140,13 @@ const { resources, truncated } = await authz.listResources({
 });
 ```
 
-Every list carries a `truncated` flag, and it is not decoration. A query that runs
-out of budget part-way returns a partial answer; a bare array cannot say "these are
-some of them", so the list would be indistinguishable from a small one and a caller
-treating it as authoritative would under-grant silently. The same applies to
+Every list carries a `truncated` flag, and it is not decoration. One node budget is
+shared by the *whole request* — the candidate walk, its fan-out, and every evaluation
+it triggers — so `maxNodes` bounds what the call can cost rather than what each
+branch can cost. A query that runs out part-way returns a partial answer; a bare
+array cannot say "these are some of them", so the list would be indistinguishable
+from a small one and a caller treating it as authoritative would under-grant
+silently. The same applies to
 `listSubjects`, whose `SubjectSet` reports truncation on the set itself.
 
 `listSubjects` is the one query that is deliberately *not* concrete. When a grant
@@ -158,7 +164,8 @@ const { allOfTypes, members, excluded } = await authz.listSubjects({
 ```
 
 ```ts
-import { createDefaultAuthz, defineModel, defineType, permission, relation } from 'tsbouncer';
+import { defineModel, defineType, permission, relation } from 'tsbouncer';
+import { createDefaultAuthz } from 'tsbouncer/defaults';
 
 const authz = createDefaultAuthz({ model });        // in-memory
 // or: createDefaultAuthz({ model, file: './tsbouncer.json' })
@@ -167,18 +174,20 @@ await authz.grant({ subject: 'user:alice', relation: 'owner', resource: 'documen
 await authz.can('user:alice', 'document.read', 'document:123'); // true
 ```
 
-`tsbouncer` re-exports the kernel plus the two stores that need no external
-dependency. If you already have Kysely, Drizzle, or Prisma, import `@tsbouncer/core`
-and the matching store — this package deliberately does not depend on any of them,
-and neither should your install graph because you read a README.
+`tsbouncer` is one package with subpath entries: the root is the kernel with
+zero dependencies, `tsbouncer/memory` and `tsbouncer/json` hold the two stores
+that need nothing external, and `tsbouncer/defaults` picks one for you. If you
+already have Kysely, Drizzle, or Prisma, import the kernel from `tsbouncer` and
+the matching store — this package deliberately depends on no ORM, and neither
+should your install graph because you read a README.
 
 Because the contract is that small, it also runs on JSON on disk, or on a SQL database
 through whichever query builder you already use:
 
 | package | takes | tested against |
 | --- | --- | --- |
-| `@tsbouncer/memory` | nothing — process-local | in-process |
-| `@tsbouncer/json` | a file path | on disk, atomic |
+| `tsbouncer/memory` | nothing — process-local | in-process |
+| `tsbouncer/json` | a file path | on disk, atomic |
 | `@tsbouncer/kysely` | your `Kysely` instance | SQLite |
 | `@tsbouncer/drizzle` | your `db` and table object | SQLite (sync) and libsql (async) |
 | `@tsbouncer/prisma` | your `PrismaClient` | SQLite via Prisma 7 |
@@ -201,10 +210,12 @@ formatExplain(result);
 ```
 
 ```
-ALLOWED  user:alice -> document:123#read
+ALLOWED  user:alice -> document:123#document.read
   + union
     + owner
-      user:alice#owner@document:123
+      + direct
+        user:alice#owner@document:123
+  (1 read)
 ```
 
 Every leaf either cites the tuples that produced it or the query that came back empty,
@@ -257,11 +268,11 @@ all resolve to **not allowed**. Never allowed, never thrown through to the calle
 
 ## Install
 
-Not published yet. When it is:
+Not published yet — `1.0.0-preview.1` is staged in this repo, not shipped.
+When it is:
 
 ```bash
-npm i tsbouncer                    # batteries-included
-npm i @tsbouncer/core              # kernel only, zero dependencies
+npm i tsbouncer                    # kernel, memory + JSON stores, defaults
 npm i @tsbouncer/kysely            # or drizzle / prisma, over your own client
 ```
 
@@ -285,7 +296,7 @@ this into something you already have. A real documents API over Express, Drizzle
 and SQLite, carrying RBAC, ReBAC and three ABAC conditions on one model, plus a
 transactional move that rewrites the access path atomically. 50 live requests.
 
-Both are the source of truth for the [guides](https://tsbouncer.dev/guides), and a
+Both are the source of truth for the [guides](https://tsbouncer.dev/docs/guides), and a
 test in this repository fails if a guide's link to one of their files stops
 resolving.
 
@@ -314,8 +325,10 @@ contract summary
 - A missing key, a mistyped key, an undeclared condition, and a predicate that
   throws all deny.
 - A cycle terminates and denies.
-- `listResources` and `listSubjects` never contradict `check` — including for
-  conditional grants, which is where they used to.
+- `listResources`, `listSubjects`, and `expand` never contradict `check` —
+  including for conditional grants, which is where they used to.
+- A budget that runs out denies, and says so: `truncated` on every answer shape,
+  so a partial answer is never mistaken for a whole one.
 - A store that over-matches, or that drops condition bindings, is rejected by the
   golden dataset rather than passing its own suite.
 
@@ -330,6 +343,9 @@ primitive, why there's no optional `check()` fast path, why conditions are funct
 lives in [PLAN.md](./PLAN.md). [IDEA.md](./IDEA.md) is the original pitch;
 [AGENTS.md](./AGENTS.md) has the working rules.
 
+How it sits next to Zanzibar and OpenFGA — including the rows where it is the
+worse answer — is the [comparison catalog](https://tsbouncer.dev/docs/reference/comparison).
+
 ## License
 
-[MIT](./LICENSE)
+[Apache-2.0](./LICENSE)

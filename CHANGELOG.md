@@ -10,8 +10,40 @@ build if they drift. Releases are cut by hand; see [CONTRIBUTING.md](./CONTRIBUT
 
 ## [Unreleased]
 
+## [1.0.0-preview.1] - 2026-09-29
+
+The first public preview. One `tsbouncer` package, three store plugins, and a
+docs site — all staged, none published yet. Preview versions chain as
+`1.0.0-preview.N`; the API is not settled.
+
+### Added
+
+- `truncated` on `Decision` and `ExplainResult`: a budget that runs out denies,
+  and now says so on every answer shape instead of only the list queries.
+- `expand` accepts request context and gates conditional memberships on it, with
+  an `expand`↔`can()` agreement test mirroring the list-query ones.
+- The docs site has a landing page at `/` with all documentation under `/docs/*`,
+  built as static output for GitHub Pages project-subpath hosting.
+
 ### Changed
 
+- **One package.** `packages/core`, `packages/stores/memory`, and
+  `packages/stores/json` are folded into `tsbouncer` subpaths — the kernel at
+  `.`, `tsbouncer/memory`, `tsbouncer/json`, `tsbouncer/defaults` — so an app
+  never loads a backend it did not ask for. The root entry pulls no storage and
+  no `node:*` imports. `@tsbouncer/kysely`, `@tsbouncer/drizzle`,
+  `@tsbouncer/prisma`, and `@tsbouncer/testkit` stay separate; the testkit takes
+  the kernel as a peer dependency.
+- A duplicate write names the rule it broke: one edge holds one param-set per
+  condition, so a re-binding is rejected on `insert` (replace it with `upsert`).
+  The message is asserted by every adapter's suite, and by conformance for the
+  behavior.
+- `tupleKey` is JSON-encoded rather than `'|'`-joined: ids may legally contain
+  the separator, which used to collapse two distinct edges into one key.
+- The set-grant scan behind `listResources` walks store cursors where offered
+  (`pagination: true`) instead of assuming one round trip fits the table; a
+  600-team test proves the paged answer equals the unpaged one. Evaluator reads
+  stay unpaged by design, and result lists stay materialized — streaming is v1.1.
 - The examples are now two applications — `hono-rbac` (Hono and a JSON file) and
   `express-drizzle` (Express, Drizzle ORM and SQLite) — replacing seven small
   programs. The interesting failures in authorization are the order of a route's
@@ -22,8 +54,12 @@ build if they drift. Releases are cut by hand; see [CONTRIBUTING.md](./CONTRIBUT
 
 ### Fixed
 
+- `expand` ignored conditions while `check` and `listSubjects` honoured them, so
+  a userset gated by a never-true predicate still expanded to its members.
+- `check()` and `explain()` dropped the budget-exhaustion flag the evaluator
+  computes, making a ceiling-hit indistinguishable from a genuine denial.
 - `listResources` lost inherited access in a self-referential chain. The walk
-  memoised the `through` relations it had followed on `type:relation`, so two
+  memoised the `through` relations it had already followed on `type:relation`, so two
   objects of the same type shared a token and the second was never walked — every
   document below the second folder of a `folder → folder → folder` tree was
   invisible to the list while `check` allowed it. The common case of inherited

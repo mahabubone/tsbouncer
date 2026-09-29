@@ -8,7 +8,7 @@ pre-1.0 library and the API is still moving.
 ## Reporting a vulnerability
 
 Please report security issues privately via GitHub's
-["Report a vulnerability"](https://github.com/tsbouncer/tsbouncer/security/advisories/new)
+["Report a vulnerability"](https://github.com/mahabubone/tsbouncer/security/advisories/new)
 on the Security tab of the repository. Do not open a public issue.
 
 Include a description, the affected version, and a minimal reproduction if you have

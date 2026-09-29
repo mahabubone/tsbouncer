@@ -16,8 +16,9 @@ These are decided. Do not relitigate them in PRs; change `PLAN.md` deliberately 
    named exports only, `verbatimModuleSyntax`. Node `>=20.11`.
 2. **No framework tooling.** No Express/Hono/Fastify/Nest middleware, no HTTP layer,
    no auth, no sessions, no JWT/OAuth. Ever. The app owns all of it.
-3. **`@tsbouncer/core` has zero dependencies and zero `node:*` imports.** Only
-   `@tsbouncer/json` may touch `fs`.
+3. **The `tsbouncer` root entry has zero dependencies and zero `node:*` imports.**
+   Only `tsbouncer/json` may touch `fs`. Subpaths (`./memory`, `./json`,
+   `./defaults`) exist so an app never loads a backend it did not ask for.
 4. **Filtered reads are the only mandatory store primitive.** Do not add an optional
    `check?`/`listObjects?` fast path. Reverse walks and `expand` derive from `read()`.
    Reimplementing wildcard/rewrite/TTU/exclusion semantics per-adapter is how this
@@ -33,13 +34,11 @@ These are decided. Do not relitigate them in PRs; change `PLAN.md` deliberately 
 ## Layout
 
 ```
-packages/core            @tsbouncer/core      the kernel, zero deps
-packages/stores/memory   @tsbouncer/memory
-packages/stores/json     @tsbouncer/json
-packages/stores/kysely   @tsbouncer/kysely
-packages/stores/drizzle  @tsbouncer/drizzle
-packages/stores/prisma   @tsbouncer/prisma
-packages/testkit         @tsbouncer/testkit   conformance + golden suites
+packages/tsbouncer            tsbouncer            kernel at `.`, `./memory`, `./json`, `./defaults`
+packages/stores/kysely        @tsbouncer/kysely
+packages/stores/drizzle       @tsbouncer/drizzle
+packages/stores/prisma        @tsbouncer/prisma
+packages/testkit              @tsbouncer/testkit   conformance + golden suites
 packages/tsbouncer       tsbouncer            batteries-included re-export
 examples/                two runnable apps, verified in CI (`pnpm examples`)
 docs/                    Astro 7 docs site; every snippet is type-checked

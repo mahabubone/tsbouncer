@@ -1,10 +1,18 @@
 {
   "name": "tsbouncer-workspace",
-  "version": "1.0.0-dev.0",
+  "version": "1.0.0-preview.1",
   "private": true,
   "type": "module",
   "description": "The bouncer for TypeScript/JS ESM-only apps.",
-  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mahabubone/tsbouncer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mahabubone/tsbouncer/issues"
+  },
+  "homepage": "https://github.com/mahabubone/tsbouncer#readme",
+  "license": "Apache-2.0",
   "packageManager": "pnpm@11.5.0",
   "engines": {
     "node": ">=20.11"
@@ -17,7 +25,9 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
+    "prepare": "husky",
     "pack:check": "turbo run pack:check --filter=!tsbouncer-docs",
+    "publish:next": "pnpm publish -r --tag next",
     "check": "pnpm lint && pnpm versions && pnpm typecheck && pnpm build && pnpm pack:check && pnpm test:coverage && pnpm examples",
     "test:coverage": "turbo run test:coverage --filter=!tsbouncer-docs",
     "coverage": "turbo run test:coverage",
@@ -27,12 +37,17 @@
     "docs:build": "pnpm --filter tsbouncer-docs build",
     "docs:test": "pnpm --filter tsbouncer-docs test"
   },
+  "lint-staged": {
+    "*.{ts,tsx,mts,js,mjs,cjs,json}": "biome check --write"
+  },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",
+    "@vitest/coverage-v8": "5.0.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
+    "tsx": "4.23.15",
     "turbo": "2.11.5",
     "typescript": "5.9.3",
-    "@vitest/coverage-v8": "5.0.2",
-    "vitest": "5.0.2",
-    "tsx": "4.23.15"
+    "vitest": "5.0.2"
   }
 }
