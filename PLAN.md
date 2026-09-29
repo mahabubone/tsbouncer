@@ -204,6 +204,6 @@ typecheck · lint · test · build · `publint` · `arethetypeswrong` (ESM-only 
 
 ## Phase 0 cleanup
 
-`git init` · add `LICENSE` (doesn't exist yet) · fill the 0-byte stubs (`README`, `AGENTS`, `CHANGELOG`, `CONTRIBUTING`, `SECURITY`, `.gitignore`, `.node-version`) · rename the directory `keyman` -> `tsbouncer`.
+`git init` · add `LICENSE` (doesn't exist yet) · fill the 0-byte stubs (`README`, `AGENTS`, `CHANGELOG`, `CONTRIBUTING`, `SECURITY`, `.gitignore`, `.node-version`) · ~~rename the directory `keyman` -> `tsbouncer`~~ **done**.
 
 **Housekeeping:** `IDEA.md` now contradicts the plan in three places — `@Keyman/*` naming (§17, §18), the optional `check?` store contract (§12), and the CLI (§16, §19). Keep it as the origin story and add `docs/architecture.md` recording the locked decisions, so the design doc doesn't mislead future readers or contributors.
