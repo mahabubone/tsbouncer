@@ -1,7 +1,7 @@
 {
   "name": "@tsbouncer/testkit",
   "version": "0.0.0",
-  "description": "Conformance suite every KeymanStore must pass. There is no CLI; this is the gate.",
+  "description": "Conformance suite every TupleStore must pass. There is no CLI; this is the gate.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -30,7 +30,7 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run"
   },
   "dependencies": {
     "@tsbouncer/core": "workspace:*"
