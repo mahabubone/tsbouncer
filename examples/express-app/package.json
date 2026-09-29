@@ -1,0 +1,30 @@
+{
+  "name": "@tsbouncer-examples/express-app",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "A real Express app: routes, identity, error handling, and two interchangeable stores.",
+  "scripts": {
+    "start": "tsx src/main.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tsbouncer/core": "workspace:*",
+    "@tsbouncer/json": "workspace:*",
+    "@tsbouncer/kysely": "workspace:*",
+    "better-sqlite3": "13.0.3",
+    "express": "5.2.1",
+    "kysely": "0.29.6",
+    "tsbouncer": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "7.6.13",
+    "@types/express": "5.0.6",
+    "@types/node": "26.6.3",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vitest": "5.0.2",
+    "@tsbouncer/memory": "workspace:*"
+  }
+}
