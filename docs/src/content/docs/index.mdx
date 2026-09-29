@@ -14,15 +14,8 @@ A model says what a *shape* of access is. Data says who holds it. The engine is
 what connects them.
 
 ```ts setup
-import {
-  createAuthz,
-  defineModel,
-  defineType,
-  memoryStore,
-  permission,
-  relation,
-  wildcard,
-} from 'tsbouncer';
+import { createAuthz, defineModel, defineType, permission, relation, wildcard } from 'tsbouncer';
+import { memoryStore } from 'tsbouncer/memory';
 
 const model = defineModel({
   types: {
@@ -119,10 +112,12 @@ DENIED  user:bob -> document:2#document.read
       - direct
         no matching tuples
     - editor
-      + userset
-        team:eng#member#editor@document:2
+      - union
         - direct
           no matching tuples
+        - userset
+          - direct
+            no matching tuples
   (4 reads)
 ```
 
@@ -148,9 +143,11 @@ library's copy.
 
 ## Where to go next
 
-- [Getting started](/getting-started) — install it and answer one question.
-- [The model](/concepts/model) — every shape the evaluator understands.
-- [Stores](/concepts/stores) — choosing one, and what the contract actually says.
-- [Recipes](/recipes/rbac) — RBAC, ReBAC, ABAC, multi-tenancy, and wiring it into
+- [Getting started](./docs/getting-started) — install it and answer one question.
+- [The model](./docs/concepts/model) — every shape the evaluator understands.
+- [Stores](./docs/concepts/stores) — choosing one, and what the contract actually says.
+- [Recipes](./docs/recipes/rbac) — RBAC, ReBAC, ABAC, multi-tenancy, and wiring it into
   a real app.
-- [Guarantees](/reference/guarantees) — the claims, checked on every build.
+- [Guarantees](./docs/reference/guarantees) — the claims, checked on every build.
+- [Comparison](./docs/reference/comparison) — against Zanzibar and OpenFGA, including
+  the rows where this library is the worse answer.

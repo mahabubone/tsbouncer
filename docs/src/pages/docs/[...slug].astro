@@ -11,7 +11,7 @@ import DocsLayout from '~/layouts/DocsLayout.astro';
  * page a reader is trying to read.
  */
 export async function getStaticPaths() {
-  // `index` is the landing page and lives at `/`; rendering it here too would
+  // `index` is the docs home and lives at `/docs`; rendering it here too would
   // give the same content two canonical URLs.
   const entries = (await getCollection('docs')).filter((e) => e.id !== 'index');
   return entries.map((entry) => ({

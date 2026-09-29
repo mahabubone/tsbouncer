@@ -7,10 +7,10 @@
   "scripts": {
     "start": "tsx src/main.ts",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@tsbouncer/core": "workspace:*",
     "@tsbouncer/drizzle": "workspace:*",
     "better-sqlite3": "13.0.3",
     "drizzle-orm": "0.45.3",
@@ -21,6 +21,7 @@
     "@types/better-sqlite3": "7.6.13",
     "@types/express": "5.0.6",
     "@types/node": "26.6.3",
+    "@vitest/coverage-v8": "5.0.2",
     "tsx": "4.23.15",
     "typescript": "5.9.3",
     "vitest": "5.0.2"

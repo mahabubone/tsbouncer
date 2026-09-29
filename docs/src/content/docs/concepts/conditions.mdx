@@ -22,15 +22,8 @@ A condition has two halves of input, and keeping them apart is the whole idea.
 | what the **caller** knows now | the request | `callerRegion: 'us'` — not in the store at all |
 
 ```ts setup
-import {
-  createAuthz,
-  defineCondition,
-  defineModel,
-  defineType,
-  memoryStore,
-  permission,
-  relation,
-} from 'tsbouncer';
+import { createAuthz, defineCondition, defineModel, defineType, formatExplain, permission, relation } from 'tsbouncer';
+import { memoryStore } from 'tsbouncer/memory';
 
 const model = defineModel({
   types: {
@@ -106,11 +99,31 @@ indistinguishable from a genuine denial. Declaring params turns that silence int
 reason in `explain()`.
 
 ```ts
-// Denied, and explain() says which of the two keys was missing.
-await authz.check(
-  { subject: 'user:dave', permission: 'document.read', resource: 'document:1' },
+// `region` is declared in `params`, and this grant never bound it — so the
+// reason is the missing key rather than "the predicate returned false".
+await authz.grant({
+  subject: 'user:eve',
+  relation: 'viewer',
+  resource: 'document:2',
+  condition: 'sameRegion',
+});
+
+const absent = await authz.explain(
+  { subject: 'user:eve', permission: 'document.read', resource: 'document:2' },
   { context: { callerRegion: 'eu' } },
 );
+if (!absent.allowed) console.log(formatExplain(absent));
+```
+
+```
+DENIED  user:eve -> document:2#document.read
+  - union
+    - viewer
+      - direct
+        every matching tuple is conditional and none of its conditions hold
+        - condition
+          condition sameRegion needs "region", which no tuple or request supplied
+  (1 read)
 ```
 
 Unknown or mistyped bound parameters are rejected at `grant` time, where a typo is
@@ -161,8 +174,6 @@ predicate that threw, and a predicate that returned false. All five resolve to *
 allowed**, and each carries a reason.
 
 ```ts
-import { formatExplain } from 'tsbouncer';
-
 const denied = await authz.explain({
   subject: 'user:dave',
   permission: 'document.read',
@@ -173,12 +184,13 @@ if (!denied.allowed) console.log(formatExplain(denied));
 
 ```
 DENIED  user:dave -> document:1#document.read
-  + viewer
-    - direct
-      user:dave#viewer@document:1
-      - condition
-        sameRegion returned false
-  (2 reads)
+  - union
+    - viewer
+      - direct
+        every matching tuple is conditional and none of its conditions hold
+        - condition
+          sameRegion returned false
+  (1 read)
 ```
 
 A condition that throws is never allowed through. The library is confused, so it
@@ -201,5 +213,5 @@ suspended account cannot be rescued by any grant.
 
 ## Next
 
-- [API: model builders](/api/model#definecondition)
-- [Recipe: ABAC](/recipes/abac) — a worked example with two conditions.
+- [API: model builders](../api/model#definecondition)
+- [Recipe: ABAC](../recipes/abac) — a worked example with two conditions.

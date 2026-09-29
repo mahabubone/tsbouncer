@@ -24,7 +24,7 @@ The library has no idea who is asking, and that is where your session lives.
 
 ```ts ts-skip
 import { type Request } from 'express';
-import { type Authz } from '@tsbouncer/core';
+import { type Authz } from 'tsbouncer';
 
 function callerOf(req: Request) {
   const userId = req.header('x-user-id');
@@ -159,16 +159,16 @@ app.get('/api/documents/:id/why', async (req, res) => {
 
 Evaluate it with the *asking* caller's context, as above — a trace computed
 without their own state explains a decision nobody made. See
-[A simple RBAC API](/guides/hono-rbac).
+[A simple RBAC API](../guides/hono-rbac).
 
 ## Running versions of this page
 
 The two guides are this recipe in applications that start, listen on a real socket,
 and answer real requests:
 
-- [A simple RBAC API](/guides/hono-rbac) — Hono and a JSON file. This recipe with
+- [A simple RBAC API](../guides/hono-rbac) — Hono and a JSON file. This recipe with
   nothing else in the way, which is the one to read first.
-- [A real-world documents API](/guides/express-drizzle) — Express, Drizzle ORM and
+- [A real-world documents API](../guides/express-drizzle) — Express, Drizzle ORM and
   SQLite, with inheritance, exclusions and three conditions. This recipe once the
   requirements have outgrown it.
 
@@ -177,5 +177,5 @@ tour and asserted in CI, so the two cannot drift apart.
 
 ## Next
 
-- [A simple RBAC API](/guides/hono-rbac) — the same shape, running.
-- [Errors](/api/errors)
+- [A simple RBAC API](../guides/hono-rbac) — the same shape, running.
+- [Errors](../api/errors)

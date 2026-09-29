@@ -66,14 +66,14 @@ across *databases* — and the dialect is where `insert` versus `upsert` diverge
 Finding resources granted through a group requires reading the whole table, because
 the store contract has no index for userset subjects. The budget bounds it, so the
 answer is partial rather than the process hanging — but a large table returns
-`truncated: true` more often than you want. See [Stores](/concepts/stores).
+`truncated: true` more often than you want. See [Stores](../concepts/stores).
 </Callout>
 
 <Callout type="caution" title="Condition contexts are untyped">
 `ConditionContext` is `{ [key: string]: unknown }`, so every predicate must narrow
 every key it reads, including ones it declared in `params`. It is the sharpest
 ergonomic edge in the API and is being fixed; the workaround is documented on
-[Conditions](/concepts/conditions#narrowing).
+[Conditions](../concepts/conditions#narrowing).
 </Callout>
 
 ## Why this exists
@@ -88,5 +88,6 @@ formatter, so a guarantee can be written once and reported on.
 
 ## Next
 
-- [Testing](/recipes/testing) — the conformance suite every store must pass.
-- [Conditions](/concepts/conditions)
+- [Testing](../recipes/testing) — the conformance suite every store must pass.
+- [Conditions](../concepts/conditions)
+- [Comparison](./comparison) — Zanzibar, OpenFGA, and where each one wins.

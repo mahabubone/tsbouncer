@@ -9,7 +9,8 @@ kind: reference
 import Callout from '~/components/Callout.astro';
 
 ```ts setup
-import { createAuthz, defineModel, defineType, memoryStore, permission, relation } from 'tsbouncer';
+import { createAuthz, defineModel, defineType, permission, relation } from 'tsbouncer';
+import { memoryStore } from 'tsbouncer/memory';
 import type { Authz, CheckRequest } from 'tsbouncer';
 
 const model = defineModel({
@@ -115,5 +116,5 @@ that took five seconds and a permission that silently denied for six months.
 
 ## Next
 
-- [API: client](/api/client#assert)
-- [A simple RBAC API](/guides/hono-rbac) — the same shape, running.
+- [API: client](./client#assert)
+- [A simple RBAC API](../guides/hono-rbac) — the same shape, running.

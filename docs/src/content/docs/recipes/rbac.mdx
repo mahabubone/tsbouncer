@@ -19,14 +19,8 @@ A `role` is a type whose `holder` relation is the assignment, and a userset edge
 how a resource picks up "everyone holding that role".
 
 ```ts setup
-import {
-  createAuthz,
-  defineModel,
-  defineType,
-  memoryStore,
-  permission,
-  relation,
-} from 'tsbouncer';
+import { createAuthz, defineModel, defineType, permission, relation } from 'tsbouncer';
+import { memoryStore } from 'tsbouncer/memory';
 
 const model = defineModel({
   types: {
@@ -139,10 +133,10 @@ await scoped.can('user:alice', 'workspace.administer', 'workspace:globex'); // f
 ## What this is not
 
 RBAC alone cannot express "the manager of the people who can see this document".
-That is a graph, and it is [the next recipe](/recipes/rebac). Most real models
+That is a graph, and it is [the next recipe](./rebac). Most real models
 need both.
 
 ## Next
 
-- [ReBAC](/recipes/rebac) — ownership, groups, and inheritance.
-- [ABAC](/recipes/abac) — gating on state the graph cannot hold.
+- [ReBAC](./rebac) — ownership, groups, and inheritance.
+- [ABAC](./abac) — gating on state the graph cannot hold.

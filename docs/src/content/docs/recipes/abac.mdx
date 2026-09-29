@@ -1,0 +1,166 @@
+---
+title: ABAC — conditions on a grant
+description: Gating a grant on state the graph cannot hold, and why the tuple's binding wins.
+section: Recipes
+order: 32
+kind: recipe
+---
+
+import Callout from '~/components/Callout.astro';
+
+## The situation
+
+A document is readable by everyone in `eu`, but only during working hours. The graph
+can say *who* holds a relation; it cannot say *when* or *from where*, because those
+are not edges — they are facts about the request.
+
+The wrong move is to sprinkle `if (region === 'eu')` into handlers. That puts the
+policy next to the transport, in every transport, and there is no `explain()` for a
+`console.log`.
+
+## The two halves
+
+A condition reads two kinds of input, and keeping them apart is the whole idea:
+
+| | carried by | example |
+| --- | --- | --- |
+| what the **writer** bound | the tuple | `region: 'eu'` — part of the grant, stored with it |
+| what the **caller** knows now | the request | `callerRegion: 'eu'` — not in the store at all |
+
+The predicate is code in the model. Only its *name* and the parameters the writer
+bound live on the tuple, so tuples still serialize cleanly and a store never
+evaluates anything.
+
+```ts setup
+import { createAuthz, defineCondition, defineModel, defineType, formatExplain, permission, relation } from 'tsbouncer';
+import { memoryStore } from 'tsbouncer/memory';
+
+const model = defineModel({
+  types: {
+    user: defineType({}),
+    document: defineType({
+      relations: { owner: relation('user'), viewer: relation('user') },
+      permissions: { read: permission.or('owner', 'viewer') },
+    }),
+  },
+  conditions: {
+    // The writer binds `region`; the caller supplies `callerRegion` at check time.
+    sameRegion: defineCondition(
+      'sameRegion',
+      (ctx) => {
+        const { region, callerRegion } = ctx;
+        if (typeof region !== 'string' || typeof callerRegion !== 'string') return false;
+        return region === callerRegion;
+      },
+      { params: { region: 'string' as const } },
+    ),
+    // Nothing to bind. Decided entirely from request state, which is the right
+    // shape for "is this the right time", not for "is this the right tenant".
+    businessHours: defineCondition(
+      'businessHours',
+      (ctx) => typeof ctx.hour === 'number' && ctx.hour >= 9 && ctx.hour < 17,
+      {},
+    ),
+  },
+});
+
+const authz = createAuthz({ model, store: memoryStore() });
+```
+
+## The data
+
+Two grants, each carrying the condition it was written with.
+
+```ts
+await authz.grant({
+  subject: 'user:alice',
+  relation: 'viewer',
+  resource: 'document:1',
+  condition: 'sameRegion',
+  context: { region: 'eu' },
+});
+
+await authz.grant({
+  subject: 'user:alice',
+  relation: 'owner',
+  resource: 'document:2',
+  condition: 'businessHours',
+});
+```
+
+## The result
+
+```ts
+await authz.check(
+  { subject: 'user:alice', permission: 'document.read', resource: 'document:1' },
+  { context: { callerRegion: 'eu' } },
+); // allowed  — the caller is in the region the writer bound
+
+await authz.check(
+  { subject: 'user:alice', permission: 'document.read', resource: 'document:1' },
+  { context: { callerRegion: 'us' } },
+); // denied   — the tuple bound `eu` and the request cannot rewrite it
+
+await authz.check(
+  { subject: 'user:alice', permission: 'document.read', resource: 'document:2' },
+  { context: { hour: 10 } },
+); // allowed
+
+await authz.check(
+  { subject: 'user:alice', permission: 'document.read', resource: 'document:2' },
+  { context: { hour: 22 } },
+); // denied
+```
+
+## Why the tuple wins
+
+The predicate sees `{ ...request, ...tuple }` — the tuple's bindings win on every
+conflict. If the request could override `region`, a caller could rewrite the
+constraint the grant was written with, and the condition would be theatre.
+
+```ts
+const denied = await authz.explain(
+  { subject: 'user:alice', permission: 'document.read', resource: 'document:1' },
+  { context: { callerRegion: 'us' } },
+);
+if (!denied.allowed) console.log(formatExplain(denied));
+```
+
+```
+DENIED  user:alice -> document:1#document.read
+  - union
+    - owner
+      - direct
+        no matching tuples
+    - viewer
+      - direct
+        every matching tuple is conditional and none of its conditions hold
+        - condition
+          sameRegion returned false
+  (2 reads)
+```
+
+<Callout type="tip" title="Build the context yourself">
+The dangerous way to use conditions is to let a client supply the whole context
+object. Derive it from the session, the database, and the clock — values the caller
+cannot forge — and the authority rule has nothing to defend.
+</Callout>
+
+## Everything fails closed
+
+An undeclared condition, a missing declared parameter, a wrong parameter type, a
+predicate that threw, and a predicate that returned false all resolve to **not
+allowed**, each with a reason in `explain()`. If the library is confused, it says no.
+
+## What this is not
+
+ABAC does not replace the graph. A condition narrows a grant that already exists; it
+cannot create one, and it cannot answer "who has access to this document?" — that is
+still `listSubjects`. Use the graph for structure and conditions for the facts about
+a single request.
+
+## Next
+
+- [Conditions](../concepts/conditions) — the split, in full.
+- [API: model builders](../api/model#definecondition) — `defineCondition`.
+- [Multi-tenancy](./multi-tenancy) — isolation without an `org_id` column.

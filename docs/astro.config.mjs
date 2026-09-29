@@ -7,6 +7,11 @@ import { codeChrome } from './src/plugins/code-chrome.mjs';
 // is nothing to run and nothing to keep patched.
 export default defineConfig({
   site: 'https://tsbouncer.dev',
+  // Project-subpath hosting (GitHub Pages): the site is served from
+  // /tsbouncer/, so every internal link must be relative or BASE_URL-aware —
+  // Astro does not rewrite absolute `/…` links under `base`. Canonicals still
+  // assume the custom domain; revisit them if Pages stays subpath-only.
+  base: '/tsbouncer/',
   output: 'static',
   trailingSlash: 'never',
   // MDX rather than markdown alone, so a page can import a component — a callout

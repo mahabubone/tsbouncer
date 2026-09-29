@@ -42,7 +42,12 @@ import { afterAll, describe, expect, it } from 'vitest';
 const here = dirname(fileURLToPath(import.meta.url));
 const CONTENT = join(here, '..', 'src', 'content', 'docs');
 const TSC = join(here, '..', 'node_modules', 'typescript', 'bin', 'tsc');
-const TSBOUNCER = join(here, '..', '..', 'packages', 'tsbouncer', 'dist', 'index.d.ts');
+const DIST = join(here, '..', '..', 'packages', 'tsbouncer', 'dist');
+const TSBOUNCER = join(DIST, 'index.d.ts');
+// Every published subpath ships its own declarations. Snippets import
+// `tsbouncer/memory` and friends, so a dist with only the root entry would
+// compile the wrong thing — or nothing — while this assertion stayed green.
+const SUBPATHS = ['memory.d.ts', 'json.d.ts', 'defaults.d.ts'].map((f) => join(DIST, f));
 
 type Shape = 'statement' | 'fragment' | 'declaration' | 'signature';
 
@@ -197,6 +202,9 @@ describe('documentation snippets', () => {
     expect(exists(TSBOUNCER), `${TSBOUNCER} is missing — build the workspace first`).toBe(
       true,
     );
+    for (const entry of SUBPATHS) {
+      expect(exists(entry), `${entry} is missing — build the workspace first`).toBe(true);
+    }
 
     const failures: string[] = [];
     let checked = 0;

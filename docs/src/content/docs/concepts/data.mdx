@@ -13,14 +13,8 @@ import Callout from '~/components/Callout.astro';
 A tuple is one edge: *this subject holds this relation on this resource*.
 
 ```ts setup
-import {
-  createAuthz,
-  defineModel,
-  defineType,
-  memoryStore,
-  permission,
-  relation,
-} from 'tsbouncer';
+import { createAuthz, defineModel, defineType, permission, relation } from 'tsbouncer';
+import { memoryStore } from 'tsbouncer/memory';
 
 const model = defineModel({
   types: {
@@ -95,6 +89,11 @@ await authz.write(seed, 'upsert'); // replace tuples that share a key
 Use `insert` in a seed script. A fixture that silently overwrites passes on a
 machine where the data already existed and fails everywhere else.
 
+One edge holds one param-set per condition. The tuple's identity is its subject,
+relation, resource, and condition *name* — not the bound params — so writing the
+same edge and condition with different params is a rejected duplicate, not a
+second row. Write with `'upsert'` to replace the binding.
+
 ## Removing
 
 ```ts
@@ -162,6 +161,6 @@ pairing one reference's type with another's id.
 
 ## Next
 
-- [Conditions](/concepts/conditions) — binding constraints to a grant.
-- [Queries](/concepts/queries) — the three whole-graph reads.
-- [Stores](/concepts/stores) — what the contract guarantees.
+- [Conditions](./conditions) — binding constraints to a grant.
+- [Whole-graph reads](../api/client#whole-graph-reads) — `expand`, `listResources`, `listSubjects`.
+- [Stores](./stores) — what the contract guarantees.

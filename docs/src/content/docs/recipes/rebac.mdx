@@ -17,15 +17,8 @@ application code is how a permission system becomes unexplainable.
 ## Ownership, groups, and inheritance
 
 ```ts setup
-import {
-  createAuthz,
-  defineModel,
-  defineType,
-  memoryStore,
-  permission,
-  relation,
-  ttu,
-} from 'tsbouncer';
+import { createAuthz, defineModel, defineType, permission, relation, ttu } from 'tsbouncer';
+import { memoryStore } from 'tsbouncer/memory';
 
 const model = defineModel({
   types: {
@@ -148,5 +141,5 @@ simply never matches.
 
 ## Next
 
-- [Multi-tenancy](/recipes/multi-tenancy) — isolation without an `org_id` column.
-- [A simple RBAC API](/guides/hono-rbac) — the same shape, in a running application.
+- [Multi-tenancy](./multi-tenancy) — isolation without an `org_id` column.
+- [A simple RBAC API](../guides/hono-rbac) — the same shape, in a running application.

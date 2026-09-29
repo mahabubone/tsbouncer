@@ -9,7 +9,7 @@ kind: guide
 import Callout from '~/components/Callout.astro';
 
 ```ts setup
-import { createAuthz } from '@tsbouncer/core';
+import { createAuthz } from 'tsbouncer';
 import { kyselyStore } from '@tsbouncer/kysely';
 import type {
   DeleteInput,
@@ -18,7 +18,7 @@ import type {
   Tuple,
   TupleStore,
   WriteInput,
-} from '@tsbouncer/core';
+} from 'tsbouncer';
 import type { Kysely } from 'kysely';
 import { storeConformance } from '@tsbouncer/testkit';
 
@@ -71,8 +71,8 @@ suite is written to catch exactly that.
 
 | package | takes | tested against |
 | --- | --- | --- |
-| `@tsbouncer/memory` | nothing — process-local | in-process |
-| `@tsbouncer/json` | a file path | on disk, atomic |
+| `tsbouncer/memory` | nothing — process-local | in-process |
+| `tsbouncer/json` | a file path | on disk, atomic |
 | `@tsbouncer/kysely` | your `Kysely` instance | SQLite |
 | `@tsbouncer/drizzle` | your `db` and table object | SQLite (sync) and libsql (async) |
 | `@tsbouncer/prisma` | your `PrismaClient` | SQLite via Prisma 7 |
@@ -143,6 +143,19 @@ if (truncated) {
 }
 ```
 
+Two properties follow from the shape above, and both are load-bearing rather
+than incidental:
+
+- Result lists are materialized. `resources` is a full array, sorted, held in
+  memory — there is no streaming form in v1, so a very large answer is a very
+  large allocation inside a bounded budget.
+- Evaluator reads are unpaged on purpose. A partial page inside `check` would
+  decide on incomplete data, so the engine never sets `limit` on a read a
+  decision depends on. The set-grant scan is the exception that proves it: it
+  only *collects* candidates that are each evaluated exactly, so it walks cursors
+  on stores that offer them (`pagination: true`) and degrades to one read where
+  they do not.
+
 For a table in the tens of thousands this is fine. For a large one, scope the
 query — filter by resource type or workspace — or read your own domain table and
 call `can()` per row.
@@ -162,9 +175,9 @@ storeConformance({
 });
 ```
 
-A store that does not pass is not done. See [Testing](/recipes/testing).
+A store that does not pass is not done. See [Testing](../recipes/testing).
 
 ## Next
 
-- [Recipe: testing](/recipes/testing) — the conformance suite and the golden dataset.
-- [API: client](/api/client#scoping-to-a-transaction) — running inside a transaction.
+- [Recipe: testing](../recipes/testing) — the conformance suite and the golden dataset.
+- [API: client](../api/client#scoping-to-a-transaction) — running inside a transaction.

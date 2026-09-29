@@ -22,7 +22,10 @@ for (const entry of entries) {
   group.pages.push(entry);
 }
 
-const href = (id: string) => `/${id}`;
+// BASE_URL arrives without a trailing slash; normalize once here so every
+// docs link below is `${base}/docs/…` rather than `${base}docs/…`.
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '');
+const href = (id: string) => `${base}/docs${id === 'index' ? '' : `/${id}`}`;
 const isActive = (id: string) => current === id;
 
 const KIND_LABEL: Record<string, string> = {

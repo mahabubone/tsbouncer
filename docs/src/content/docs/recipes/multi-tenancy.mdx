@@ -1,0 +1,117 @@
+---
+title: Multi-tenancy — isolation without an org_id column
+description: Scope every grant to a tenant through the graph, so isolation is the shape of the data.
+section: Recipes
+order: 33
+kind: recipe
+---
+
+import Callout from '~/components/Callout.astro';
+
+## The situation
+
+A SaaS product serves `acme` and `globex`. Both have users, both have documents, and
+none of them may ever see the other's.
+
+The usual answer is `WHERE org_id = ?` on every query. That works right up until a
+handler forgets it, or a background job reads by id alone, or an export endpoint takes
+a list of ids from the request body. The filter is correct and the *call site* is the
+bug, and there is no way to assert on a call site.
+
+Put the tenant in the graph instead. Isolation becomes a property of the data you can
+write a test against.
+
+## The model
+
+A document names a tenant, never a person. Membership lives on the tenant, and the
+permission reaches it by walking the edge.
+
+```ts setup
+import { createAuthz, defineModel, defineType, permission, relation, ttu } from 'tsbouncer';
+import { memoryStore } from 'tsbouncer/memory';
+
+const model = defineModel({
+  types: {
+    user: defineType({}),
+    tenant: defineType({
+      relations: { member: relation('user') },
+      permissions: { view: permission.or('member') },
+    }),
+    document: defineType({
+      relations: {
+        owner: relation('user'),
+        org: relation('tenant'),
+      },
+      permissions: {
+        read: permission.or('owner', ttu('org', 'view')),
+        write: permission.or('owner'),
+      },
+    }),
+  },
+});
+
+const authz = createAuthz({ model, store: memoryStore() });
+```
+
+`ttu('org', 'view')` reads as: *follow the document's `org` to the tenant, then take
+`view` over there.* Membership is granted once per tenant and every document in that
+tenant inherits it — no per-document roster to drift.
+
+## The data
+
+```ts
+await authz.grant({ subject: 'user:alice', relation: 'member', resource: 'tenant:acme' });
+await authz.grant({ subject: 'user:bob', relation: 'member', resource: 'tenant:globex' });
+
+await authz.grant({ subject: 'tenant:acme', relation: 'org', resource: 'document:1' });
+```
+
+## The result
+
+```ts
+await authz.can('user:alice', 'document.read', 'document:1'); // true   — acme member
+await authz.can('user:bob', 'document.read', 'document:1'); // false  — globex member
+await authz.can('user:alice', 'document.write', 'document:1'); // false — read only
+```
+
+Isolation is now a query, not a convention:
+
+```ts
+const { resources } = await authz.listResources({
+  subject: 'user:bob',
+  permission: 'document.read',
+});
+// document:1 is not among them, and a test can assert that.
+```
+
+<Callout type="caution" title="The graph defends reads, not writes">
+This does **not** stop a buggy writer from granting `user:bob` `owner` on
+`document:1` — that tuple is legal and the engine will honour it. The write boundary
+is still yours: take the tenant from the session, derive the resource id from it, and
+never accept either from a request body. What the graph buys you is that *reads* are
+uniform, checkable, and explained — and that a cross-tenant grant has to be written
+down as a tuple you can find.
+</Callout>
+
+## Why not a `tenant` field on every type
+
+You can put `org_id` on `document`, `folder`, `report`, and every other type, and
+re-assert the filter on each. The graph already has a shape for "belongs to": an edge.
+One `org` relation and one `ttu` replaces a column and a filter per type, and adding a
+type means adding an edge rather than another `WHERE`.
+
+Prefixing ids (`document:acme:1`) helps too, but it only encodes the tenant — it does
+not connect membership to access. The edge does both.
+
+## What this is not
+
+There is no tenant *awareness* in the engine. It does not know what `tenant:acme`
+means, it will not reject a tuple that crosses tenants, and it will not infer a
+tenant from a request. The model is yours; the isolation it encodes is exactly the
+isolation you wrote.
+
+## Next
+
+- [ReBAC](./rebac) — ownership, groups, and folder trees.
+- [ABAC](./abac) — gating a grant on state the graph cannot hold.
+- [Stores](../concepts/stores) — the contract every store has to honour.

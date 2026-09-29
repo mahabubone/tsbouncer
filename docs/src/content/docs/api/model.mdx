@@ -12,17 +12,8 @@ The builders, in scope for every example on this page:
 
 ```ts setup
 import type { SetExpression } from 'tsbouncer';
-import {
-  createAuthz,
-  defineCondition,
-  defineModel,
-  defineType,
-  memoryStore,
-  permission,
-  relation,
-  ttu,
-  wildcard,
-} from 'tsbouncer';
+import { createAuthz, defineCondition, defineModel, defineType, permission, relation, ttu, wildcard } from 'tsbouncer';
+import { memoryStore } from 'tsbouncer/memory';
 
 const store = memoryStore();
 ```
@@ -170,10 +161,10 @@ sameRegion: defineCondition(
 every key it reads, including ones it declared. `params` governs *write-time
 validation* of what a tuple may bind; it does not type the predicate. This is the
 sharpest ergonomic edge in the API today and is a known gap, not a design
-decision. See [Conditions](/concepts/conditions#narrowing).
+decision. See [Conditions](../concepts/conditions#narrowing).
 </Callout>
 
 ## Next
 
-- [API: types](/api/types) — deriving checked strings from the model.
-- [API: errors](/api/errors)
+- [The model](../concepts/model) — the semantics these builders express.
+- [API: errors](./errors)

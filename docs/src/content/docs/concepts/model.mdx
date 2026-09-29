@@ -13,17 +13,8 @@ code, and it is validated at `defineModel` time. Relations are where tuples may 
 written; permissions are what you ask about.
 
 ```ts setup
-import {
-  createAuthz,
-  defineCondition,
-  defineModel,
-  defineType,
-  memoryStore,
-  permission,
-  relation,
-  ttu,
-  wildcard,
-} from 'tsbouncer';
+import { createAuthz, defineCondition, defineModel, defineType, permission, relation, ttu, wildcard } from 'tsbouncer';
+import { memoryStore } from 'tsbouncer/memory';
 
 const model = defineModel({
   types: {
@@ -211,7 +202,7 @@ const conditionalModel = defineModel({
 });
 ```
 
-Conditions are covered in depth on [Conditions](/concepts/conditions).
+Conditions are covered in depth on [Conditions](./conditions).
 
 ## Putting the shapes together
 
@@ -244,6 +235,6 @@ out write to everyone holding it. Inherited, it follows the parent folder's
 
 ## Next
 
-- [Data](/concepts/data) — the reference format and write-time validation.
-- [Conditions](/concepts/conditions) — attribute-gated access.
-- [API: model builders](/api/model) — every builder, with signatures.
+- [Data](./data) — the reference format and write-time validation.
+- [Conditions](./conditions) — attribute-gated access.
+- [API: model builders](../api/model) — every builder, with signatures.

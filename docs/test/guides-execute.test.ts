@@ -69,7 +69,12 @@ describe('guide assertions execute', () => {
         const err = error as { stdout?: unknown; stderr?: unknown; message?: string };
         const out = [err.stdout, err.stderr].filter(Boolean).join('\n');
         expect.unreachable(
-          `${relative(CONTENT, join(CONTENT, page))} asserts failed:\n${String(out || err.message).split('\n').filter((l) => l.includes('AssertionError') || l.includes('assert')).join('\n')}`,
+          `${relative(CONTENT, join(CONTENT, page))} asserts failed:\n${String(
+            out || err.message,
+          )
+            .split('\n')
+            .filter((l) => l.includes('AssertionError') || l.includes('assert'))
+            .join('\n')}`,
         );
       } finally {
         rmSync(dir, { recursive: true, force: true });

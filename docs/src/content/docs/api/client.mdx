@@ -12,15 +12,8 @@ import Callout from '~/components/Callout.astro';
 example on this page runs against this setup:
 
 ```ts setup
-import {
-  createAuthz,
-  defineModel,
-  defineType,
-  isAuthorizationError,
-  memoryStore,
-  permission,
-  relation,
-} from 'tsbouncer';
+import { createAuthz, defineModel, defineType, isAuthorizationError, permission, relation } from 'tsbouncer';
+import { memoryStore } from 'tsbouncer/memory';
 import type { EvaluationLimits, Model, TupleStore } from 'tsbouncer';
 
 const model = defineModel({
@@ -89,8 +82,13 @@ interface Decision {
   subject: string;
   permission: string;
   resource: string;
+  truncated: boolean;
 }
 ```
+
+`truncated` says the budget ran out mid-evaluation, so `allowed: false` is a
+lower bound rather than a denial from the data. `explain()` carries the same
+flag alongside its tree.
 
 ### assert
 
@@ -120,8 +118,8 @@ async function requireWrite(subject: string, resource: string): Promise<Response
 explain(request, options?): Promise<ExplainResult>
 ```
 
-The decision *and* the reasoning. See [Queries](/concepts/queries#explain) for the
-shape of the tree.
+The decision *and* the reasoning. See [The decision](..#the-decision) for a
+worked transcript.
 
 ## Whole-graph reads
 
@@ -132,7 +130,8 @@ listResources({ subject, permission, context? }): Promise<ResourceList>
 ```
 
 Everything the subject holds `permission` on, including access inherited from a
-folder or a group.
+folder or a group. On what that costs at scale, see
+[listResources is O(store size)](../concepts/stores#listresources-is-ostore-size-in-the-worst-case).
 
 ```ts
 interface ResourceList {
@@ -175,11 +174,14 @@ simply empty.
 ### expand
 
 ```ts ts-skip
-expand({ subject }): Promise<ExpandResult>
+expand({ subject }, options?): Promise<ExpandResult>
 ```
 
 Every concrete subject a userset contains, transitively. A wildcard expands to
-itself rather than to an invented list.
+itself rather than to an invented list. Conditional memberships are gated on
+`options` context — the tuple's bindings win and the request fills the gaps, the
+same merge `check` applies — so the expansion never lists a member the decisions
+would deny.
 
 ```ts
 const { subjects, truncated } = await authz.expand({ subject: 'team:eng#member' });
@@ -227,6 +229,6 @@ alone, and these are how you ask.
 
 ## Next
 
-- [API: model builders](/api/model)
-- [API: types](/api/types) — deriving strings from the model.
-- [API: errors](/api/errors) — codes, and what they mean.
+- [API: model builders](./model)
+- [The model](../concepts/model) — relations, permissions, and the shapes they derive.
+- [API: errors](./errors) — codes, and what they mean.

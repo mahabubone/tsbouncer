@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { type Authz, createAuthz } from '@tsbouncer/core';
+import { type Authz, createAuthz } from 'tsbouncer';
 import { createApp, withErrorHandling } from './app.js';
 import { type Handle, openDatabase } from './db/index.js';
 import * as schema from './db/schema.js';

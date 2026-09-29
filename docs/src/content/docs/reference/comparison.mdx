@@ -1,0 +1,285 @@
+---
+title: Comparison
+description: tsbouncer next to Zanzibar and OpenFGA — shape, model, queries, consistency, and what each one deliberately lacks.
+section: Reference
+order: 41
+kind: guide
+---
+
+import Callout from '~/components/Callout.astro';
+
+`tsbouncer` is not a Zanzibar replacement, and this page is not an argument that it
+is. Zanzibar is a paper about a system nobody outside Google can run, and OpenFGA
+is a serious, CNCF-incubating server that implements its ideas in the open. What
+this library does is smaller: it is the evaluator, in your process, over a store
+your application already has.
+
+So this is a catalog rather than a pitch, and the columns where `tsbouncer` is the
+worse answer are listed as plainly as the ones where it is not.
+
+## What each one is
+
+**Zanzibar** is Google's global authorization system, described in
+["Zanzibar: Google's Consistent, Global Authorization System"](https://www.usenix.org/system/files/atc19-pang.pdf)
+(Pang et al., USENIX ATC 2019). It is not open source. There is no implementation
+to install and no API to call from outside Google — the paper describes the
+design, the namespace configuration language, the RPC surface, and the measured
+behaviour of a system running inside one company's infrastructure.
+
+**OpenFGA** is an open-source authorization server inspired by that paper.
+Originally built at Auth0/Okta, open sourced in June 2022, and donated to CNCF —
+Sandbox in 2022, **Incubating since October 28, 2025**. It is a Go server you run
+yourself, speaking HTTP and gRPC, with a typed model language, SDKs, a CLI, a
+playground, and a Terraform provider. See [openfga.dev](https://openfga.dev) and
+the [source](https://github.com/openfga/openfga).
+
+**`tsbouncer`** is a TypeScript authorization graph SDK. You declare a model in
+code, write tuples into storage you choose, and call `can()` from inside the
+request. There is no server, no port, and no network hop.
+
+## Reading the tables
+
+| cell | meaning |
+| --- | --- |
+| ✓ | supported |
+| a name in backticks | the concrete API, keyword or builder |
+| — | this page has no source for it, **not** that it is unsupported |
+
+<Callout type="caution" title="Only one column is asserted from tests">
+The `tsbouncer` column is the claim of this repository and every row of it is
+checked by CI — see [Guarantees](./guarantees). The Zanzibar and OpenFGA
+columns are summaries of their published material, linked under
+[Sources](#sources); they are written to be fair, not to be authoritative, and
+those projects should be read directly before you commit to either.
+</Callout>
+
+## Shape
+
+| | Zanzibar | OpenFGA | `tsbouncer` |
+| --- | --- | --- | --- |
+| What it is | an internal Google service, described in a paper | an authorization server | an in-process library |
+| Where it runs | inside Google | a server you deploy, or embedded as a Go library | your Node process |
+| Availability of the code | not published | Apache-2.0 | Apache-2.0 |
+| What a check costs | an RPC | an HTTP call — the Node/JS SDK is a *client* of that server, not an evaluator | a function call plus the store reads the walk needs |
+| Needs a daemon | — | yes | no |
+| Authentication | — | token and mTLS options on the server | none — you already authenticated the request |
+| Extra runtime services | — | a datastore, and optionally its cache | none |
+
+The shape table is the one that matters most, because it decides everything else.
+A server can be shared by eight services written in five languages; a library
+cannot. A library has no serialization boundary, no connection pool, and no place
+for a latency budget to hide; a server has all three and pays for them on every
+call.
+
+## Model and data
+
+| | Zanzibar | OpenFGA | `tsbouncer` |
+| --- | --- | --- | --- |
+| Data | relation tuples in namespaces | relation tuples in a store, beside an uploaded model | tuples in a `TupleStore` you implement or pick |
+| Authoring language | namespace configurations with userset rewrite rules — examples are in the paper, the language is not a public spec | the OpenFGA DSL, and its JSON equivalent | TypeScript builders: `relation()`, `permission`, `ttu()`, `wildcard()` |
+| Union | ✓ | `or` | `permission.or()` / `.or()` |
+| Intersection | ✓ | `and` | `permission.allOf()` / `.and()` |
+| Exclusion | ✓ | `but not` | `.except()` |
+| Tuple-to-userset | ✓ | `x from y` | `relation(type, { through })` and `ttu()` |
+| Wildcard subjects | — | `user:*` in a type restriction | `wildcard('user')`, stored as `user:*` |
+| Conditions | — | conditional tuples with CEL expressions | named predicates written as ordinary functions |
+| Where params come from | — | the tuple and the request | the tuple wins; the request only fills gaps |
+| Re-binding one edge | — | — | rejected on `insert`, replaced on `upsert` — one edge holds one param-set per condition |
+| Model validation | — | checked when the model is written to the store | `defineModel()` at startup, plus write-time tuple validation |
+| Model rollout | — | upload a new model version, pin it per request | a release — the model is code that the app compiles against |
+
+The conditions row is the one people arrive with questions about. OpenFGA puts
+CEL expressions in the model and evaluates them in the server. `tsbouncer` keeps
+the predicate in code, next to the rest of your domain logic, and puts only the
+condition's *name* and its bound params on the tuple. See
+[Conditions](../concepts/conditions).
+
+## Queries
+
+| | Zanzibar | OpenFGA | `tsbouncer` |
+| --- | --- | --- | --- |
+| "is this allowed?" | `Check` | `Check`, plus `BatchCheck` | `can()` / `check()` / `assert()` |
+| The reasoning behind a decision | — | — | `explain()` returns a decision tree and a read count; `formatExplain()` renders it |
+| Expand a userset | `Expand` | `Expand` | `expand()` — conditional memberships gated on the request context |
+| "what can this subject reach?" | — | `ListObjects`, including a streaming form | `listResources()` → `{ resources, truncated }` |
+| "who can reach this object?" | — | `ListUsers` | `listSubjects()` → a `SubjectSet` |
+| Reading and watching tuples | `Read`, `Write`, `Watch` | `Read`, `Watch` | filtered `read()` on the store; `watch` is a declared capability no adapter implements yet |
+| Tuples that exist for one request only | — | contextual tuples | — |
+
+Two rows are worth their own paragraph.
+
+**The decision trace.** The paper describes no API that returns why a check came
+back the answer it did, and OpenFGA exposes no equivalent endpoint. `explain()`
+does — a tree of the nodes the walk actually visited, plus `reads`, which is how
+you find a hot path. The same information is what
+[Guarantees](./guarantees) asserts against a real store.
+
+**The list queries are not symmetric.** `listResources()` answers a concrete
+question and returns `{ resources, truncated }`, never a bare array: a budget that
+runs out mid-enumeration yields a partial answer, and a bare array cannot
+distinguish that from a small result set. `listSubjects()` is deliberately
+*symbolic* — a `user:*` grant answers `allOfTypes: ['user']` rather than inventing
+a member list, because a set that claims to be exhaustive and is not is the
+list-shaped version of a fail-open bug.
+
+## Consistency and limits
+
+| | Zanzibar | OpenFGA | `tsbouncer` |
+| --- | --- | --- | --- |
+| Cross-client read-your-writes | ✓ a *zookie* from an earlier read or write bounds how stale a later one may be | per-request `consistency` preference: `MINIMIZE_LATENCY` (default, may use the cache) or `HIGHER_CONSISTENCY` (bypasses it); caching is off by default | none across processes |
+| Within one process | — | — | as fresh as the store handle you pass — with the kernel plus a SQL adapter, `withStore(trx)` reads inside your transaction; the `tsbouncer/memory` and `tsbouncer/json` stores are non-transactional |
+| Where a runaway query is stopped | — | the server | a per-request budget: `maxDepth`, `maxNodes`, `maxDurationMs` |
+| What exhaustion does | — | — | denies; `truncated` is reported on every answer shape — `check()`, `explain()`, and both list queries — so a partial answer is never mistaken for a whole one |
+| Failure when the store is unreachable | — | — | denies — every condition error, missing key, and thrown predicate resolves to not allowed |
+| Measured scale | trillions of ACLs, millions of checks per second, p95 under 10 ms, above 99.999% availability over three years | adoption reviewed in the CNCF due-diligence process | not claimed — and bounded by design: lists are materialized, evaluator reads are unpaged, the set-grant scan walks cursors where offered |
+
+<Callout type="tip" title="The budget is per request, not per branch">
+Tuple-to-userset fans out multiplicatively, and `listResources` evaluates every
+candidate — so a per-branch limit is one a wide graph walks straight past. One
+budget is shared by every part of a request, and it counts charges rather than
+just reads: a walk step, a store read, and an evaluation frame each spend one.
+Defaults are 25 levels, 10 000 nodes, and 1 second; all three are overridable per
+call.
+</Callout>
+
+## Operations and ecosystem
+
+| | Zanzibar | OpenFGA | `tsbouncer` |
+| --- | --- | --- | --- |
+| License | not published | Apache-2.0 | Apache-2.0 |
+| Governance | Google | CNCF Incubating | none — a repository |
+| Server | the service itself | HTTP and gRPC | none, deliberately |
+| SDKs | — | Go, Java, Node.js, Python, .NET; Go can be embedded | `tsbouncer`, with `tsbouncer/memory`, `tsbouncer/json`, and `tsbouncer/defaults` subpaths; ESM-only, Node 20.11 or newer |
+| CLI / playground | — | both, plus a Terraform provider | none |
+| Storage | Spanner-backed, sharded per namespace, replicated globally | in-memory, PostgreSQL, MySQL, SQLite (beta) | memory, JSON file, Kysely, Drizzle, Prisma — one shared table contract |
+| Telemetry | — | OpenTelemetry traces and metrics | none of its own; `explain()` gives you read counts |
+| Conditions language | — | CEL, evaluated by the server | TypeScript functions, evaluated in-process |
+
+## The same rule, three ways
+
+Owner or editor may read a document, unless it is banned.
+
+**Zanzibar.** The paper publishes namespace configurations in a protobuf-like
+form, and this rule is its exact idiom. A rewrite rule's leaf nodes are `this`,
+`computed_userset` and `tuple_to_userset`, and expressions compose with "union,
+intersection, and exclusion" — so `read` is a rule that unions the `owner` and
+`editor` usersets and subtracts `banned`. There is nothing here to run: the
+configuration is evaluated by a service nobody outside Google operates.
+
+**OpenFGA.**
+
+```txt
+type team
+  relations
+    define member: [user]
+
+type document
+  relations
+    define owner: [user]
+    define editor: [user, team#member]
+    define banned: [user]
+    define base: owner or editor
+    define can_read: base but not banned
+```
+
+**`tsbouncer`.** This block is compiled by the docs build along with everything
+below it, so if it were wrong the site would not build.
+
+```ts setup
+import { createAuthz, defineModel, defineType, permission, relation } from 'tsbouncer';
+import { memoryStore } from 'tsbouncer/memory';
+
+const model = defineModel({
+  types: {
+    user: defineType({}),
+    document: defineType({
+      relations: {
+        owner: relation('user'),
+        editor: relation('user'),
+        banned: relation('user'),
+      },
+      permissions: {
+        read: permission.or('owner', 'editor').except('banned'),
+      },
+    }),
+  },
+});
+
+const authz = createAuthz({ model, store: memoryStore() });
+```
+
+```ts
+await authz.grant({ subject: 'user:alice', relation: 'owner', resource: 'document:1' });
+await authz.grant({ subject: 'user:bob', relation: 'editor', resource: 'document:1' });
+
+await authz.can('user:alice', 'document.read', 'document:1'); // true
+await authz.can('user:bob', 'document.read', 'document:1'); // true — editor, not owner
+```
+
+The difference is in the last line of each listing. OpenFGA's `can_read` is data
+the server parses when the call arrives; `tsbouncer`'s `read` is an expression
+that ships in the same file as the code depending on it, and `defineModel()`
+validates it before the first check runs. The exclusion cannot short-circuit
+either — an owner who is also banned is denied, which is
+[one of the guarantees](./guarantees#engine).
+
+## Choosing
+
+**Reach for an OpenFGA-style server when** several services or languages must
+share one answer; authorization needs to be its own deployable with its own data
+and its own rollout; policy must be authored as data rather than compiled with
+the code that depends on it; or the question is large enough that you want a
+central PDP with a change feed behind it.
+
+**Reach for `tsbouncer` when** one application owns its own authorization data in
+its own database; you want the rules to change in the same release as the code
+that relies on them; a network hop per check is unacceptable at your call volume;
+or the explanation of a decision is worth as much as the decision.
+
+**They are not exclusive.** An in-app evaluator for the request you are already
+serving and a central service for cross-service questions are two different jobs.
+
+## What `tsbouncer` does not have
+
+An honest catalog lists its own gaps first.
+
+- **No server, no HTTP layer, no CLI, no middleware, no auth, no sessions, no
+  JWT.** Deliberate, and fixed in [AGENTS.md](https://github.com/mahabubone/tsbouncer/blob/main/AGENTS.md).
+- **No cross-process read-your-writes token.** A second process reads only as
+  fresh as its own transaction. OpenFGA and Zanzibar both solve this; here it is
+  your store's problem.
+- **No contextual tuples.** A check reads the store it was given. `withStore()`
+  swaps the handle — typically for a transaction — it does not inject ephemeral
+  tuples for one request.
+- **The model is code.** There is no upload step and no model id to pin per
+  request, which means changing a rule is a deploy.
+- **No policy language.** Predicates are TypeScript functions. There is no CEL,
+  no Rego, and no way for a non-programmer to edit a rule without a release.
+- **No change feed.** `watch` exists as a capability in the store contract and no
+  adapter implements it, so nothing here invalidates a cache you built.
+- **No incremental or precomputed evaluation.** Every check is a walk with a
+  budget; there is no materialized decision graph to keep warm.
+- **Not everything is tested.** The SQL adapters declare `sqlite | postgres |
+  mysql` but CI runs SQLite, and pagination is only exercised on some adapters.
+  [Guarantees](./guarantees) says which rows are unverified.
+
+## Other Zanzibar descendants
+
+OpenFGA is not the only open implementation of the paper — SpiceDB, Ory Keto and
+Permify are servers of the same lineage, and all of them share the properties in
+the [Shape](#shape) table that `tsbouncer` does not. Further out, OPA, Cedar and
+Casbin are a different family entirely: policy engines rather than relationship
+graphs, answering the question from a rule document instead of a tuple store.
+
+## Sources
+
+- [Zanzibar: Google's Consistent, Global Authorization System](https://www.usenix.org/system/files/atc19-pang.pdf) — Pang et al., USENIX ATC 2019.
+- [openfga.dev](https://openfga.dev) and [github.com/openfga/openfga](https://github.com/openfga/openfga)
+- [Query consistency modes](https://openfga.dev/docs/interacting/consistency)
+- [OpenFGA becomes a CNCF incubating project](https://www.cncf.io/blog/2025/11/11/openfga-becomes-a-cncf-incubating-project/)
+
+## Next
+
+- [Guarantees](./guarantees) — the `tsbouncer` column, clause by clause.
+- [The model](../concepts/model) — every shape the evaluator understands.
+- [Stores](../concepts/stores) — the contract the adapters have to pass.

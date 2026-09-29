@@ -10,16 +10,16 @@ import Callout from '~/components/Callout.astro';
 ## Install
 
 ```bash
-npm i tsbouncer                    # batteries-included
-npm i @tsbouncer/core              # the kernel, zero dependencies
+npm i tsbouncer                    # kernel, memory + JSON stores, defaults
 npm i @tsbouncer/kysely            # or drizzle / prisma, over your own client
 ```
 
-`tsbouncer` re-exports the kernel plus the two stores that need no external
-dependency. If you already have Kysely, Drizzle, or Prisma, import `@tsbouncer/core`
-and the matching store — the batteries-included package deliberately does not
-depend on any of them, and neither should your install graph because you read a
-README.
+`tsbouncer` is one package with subpath entries: the root is the kernel with
+zero dependencies, `tsbouncer/memory` and `tsbouncer/json` hold the two stores
+that need nothing external, and `tsbouncer/defaults` picks one for you. If you
+already have Kysely, Drizzle, or Prisma, import the kernel from `tsbouncer` and
+the matching store — this package deliberately depends on no ORM, and neither
+should your install graph because you read a README.
 
 ESM only. There is no CommonJS build, and `require()` will not work. Node 20.11 or
 newer.
@@ -53,13 +53,14 @@ const model = defineModel({
 ## Connect a store
 
 ```ts
-import { createAuthz, memoryStore } from 'tsbouncer';
+import { createAuthz } from 'tsbouncer';
+import { memoryStore } from 'tsbouncer/memory';
 
 const authz = createAuthz({ model, store: memoryStore() });
 ```
 
 `memoryStore` is process-local and is the right choice for tests. For anything
-else, see [Stores](/concepts/stores).
+else, see [Stores](./concepts/stores).
 
 ## Write and ask
 
@@ -112,11 +113,11 @@ app.get('/api/documents/:id', async (req, res) => {
 `isAuthorizationError` is true for a *denied check* and also for a *rejected
 write*. Mapping both to 403 is how a typo in a request body reports itself to the
 user as "you are not allowed", with nothing in the logs to say the server is at
-fault. Branch on `error.code` — see [Errors](/api/errors).
+fault. Branch on `error.code` — see [Errors](./api/errors).
 </Callout>
 
 ## Next
 
-- [The model](/concepts/model) — every shape the evaluator understands.
-- [Data](/concepts/data) — the reference format, and what write-time validation catches.
-- [HTTP integration](/recipes/http) — Express, Hono, Fastify, and where to put the check.
+- [The model](./concepts/model) — every shape the evaluator understands.
+- [Data](./concepts/data) — the reference format, and what write-time validation catches.
+- [HTTP integration](./recipes/http) — Express, Hono, Fastify, and where to put the check.

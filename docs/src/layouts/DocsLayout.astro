@@ -17,6 +17,8 @@ interface Props {
 const { title, description, headings, current, kind = 'guide', status = 'stable' } =
   Astro.props;
 const path = Astro.url.pathname;
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '');
+const docs = (id: string) => `${base}/docs/${id}`;
 ---
 
 <!doctype html>
@@ -76,7 +78,7 @@ const path = Astro.url.pathname;
           </svg>
         </button>
 
-        <a href="/" class="flex items-center gap-2 font-semibold tracking-tight">
+        <a href={`${base}/`} class="flex items-center gap-2 font-semibold tracking-tight">
           <span
             class="grid h-6 w-6 place-items-center rounded-md bg-[var(--accent)] text-[0.8125rem] font-bold text-[var(--accent-contrast)]"
             aria-hidden="true"
@@ -87,7 +89,7 @@ const path = Astro.url.pathname;
 
         <span
           class="rounded-full border border-[var(--border)] px-2 py-0.5 font-mono text-[0.6875rem] text-[var(--text-subtle)]"
-          >1.0.0-dev.0</span
+          >1.0.0-preview.1</span
         >
 
         <div class="ml-auto flex items-center gap-1">
@@ -106,12 +108,12 @@ const path = Astro.url.pathname;
             )
           }
           <a
-            href="/api/client"
+            href={docs('api/client')}
             class="hidden rounded-lg px-3 py-1.5 text-sm text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)] sm:block"
             >API</a
           >
           <a
-            href="https://github.com/tsbouncer/tsbouncer"
+            href="https://github.com/mahabubone/tsbouncer"
             rel="noreferrer noopener"
             class="rounded-lg p-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
             aria-label="GitHub"
@@ -203,11 +205,11 @@ const path = Astro.url.pathname;
         class="mx-auto flex max-w-(--container) flex-col gap-2 px-5 py-8 text-sm text-[var(--text-subtle)] sm:flex-row sm:items-center sm:justify-between sm:px-8"
       >
         <p>
-          tsbouncer <span class="font-mono">1.0.0-dev.0</span> · MIT · ESM only
+          tsbouncer <span class="font-mono">1.0.0-preview.1</span> · Apache-2.0 · ESM only
         </p>
         <p>
           Pre-1.0. The API is not settled, and the
-          <a href="/reference/guarantees" class="text-[var(--accent)] underline">guarantees page</a>
+          <a href={docs('reference/guarantees')} class="text-[var(--accent)] underline">guarantees page</a>
           is checked on every build.
         </p>
       </div>

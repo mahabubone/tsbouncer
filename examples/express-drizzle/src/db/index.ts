@@ -1,10 +1,10 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { TupleStore } from '@tsbouncer/core';
 import { drizzleStore } from '@tsbouncer/drizzle';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
+import type { TupleStore } from 'tsbouncer';
 import {
   documents,
   folders,
