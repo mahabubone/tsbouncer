@@ -9,7 +9,7 @@
 |---|---|
 | Name | `tsbouncer` + `@tsbouncer/*` (both verified free on npm) |
 | License | Apache-2.0, public |
-| Module system | **ESM-only.** No CJS, no dual build. Node `>=20.11` |
+| Module system | **ESM-only.** No CJS, no dual build. Node `>=22` |
 | Model | Object literal + typed helpers, defined and validated **in code at runtime** |
 | Multi-tenancy | Opaque refs — tenancy is entirely the app's concern |
 | Store contract | Filtered reads only; capabilities declared, not sniffed |
@@ -86,7 +86,7 @@ normal fate of documentation, and the repository's READMEs carried unverified
 snippets for months. A snippet that stops compiling now fails CI.
 
 The site requires Node 22 (Astro 7's floor) while the library publishes
-`>=20.11`, so it is excluded from the library's turbo tasks and built by a separate
+`>=22`, so it is excluded from the library's turbo tasks and built by a separate
 CI job. The docs toolchain must not drag the library's Node floor up.
 
 ## Public API

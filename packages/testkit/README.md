@@ -67,7 +67,7 @@ one line for a CI step.
 
 ## Requirements
 
-ESM only, Node `>=20.11`, Vitest `>=3` (peer dependency).
+ESM only, Node `>=22`, Vitest `>=3` (peer dependency).
 
 ## Links
 

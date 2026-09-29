@@ -22,7 +22,7 @@ pnpm test
 pnpm lint
 ```
 
-Node `>=20.11`. The repo is ESM-only; don't add CommonJS, `require()`, or
+Node `>=22`. The repo is ESM-only; don't add CommonJS, `require()`, or
 `export =` to anything.
 
 ## Writing a store

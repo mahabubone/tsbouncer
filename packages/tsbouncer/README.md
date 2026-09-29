@@ -50,7 +50,7 @@ npm i tsbouncer
 
 ## Requirements
 
-ESM only. No CommonJS build, no dual package, no `require()`. Node `>=20.11`.
+ESM only. No CommonJS build, no dual package, no `require()`. Node `>=22`.
 
 ## Links
 

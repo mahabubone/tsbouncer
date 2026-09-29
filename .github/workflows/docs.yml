@@ -1,0 +1,71 @@
+name: Docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'packages/**'
+      - 'examples/**'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+
+# Pages deploys need these and nothing else.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# A deploy superseded mid-flight leaves a half-published site. Let the running
+# one finish; queue only one behind it.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 11.5.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the library
+        # The docs type-check their snippets against the *built* package, so a
+        # snippet using an API that does not exist fails here rather than in a
+        # reader's terminal. Mirrors the CI docs job step for step.
+        run: pnpm build
+
+      - name: Check every documentation snippet
+        run: pnpm docs:test
+
+      - name: Build the site
+        run: pnpm docs:build
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@7bc9a4b27ad31e48c0b78c489a65405b07997f2 # v3.1.0
+        with:
+          path: docs/dist
+
+  deploy:
+    name: deploy
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@45244edd8f9926745f21e0eb7f3dba3c38136c0893e69d1 # v4.0.5

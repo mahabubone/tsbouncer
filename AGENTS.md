@@ -13,7 +13,7 @@ pluggable storage. See `PLAN.md` for the full design and `IDEA.md` for the origi
 These are decided. Do not relitigate them in PRs; change `PLAN.md` deliberately first.
 
 1. **ESM-only.** No CJS, no dual builds. `"type": "module"`, `import`-only exports,
-   named exports only, `verbatimModuleSyntax`. Node `>=20.11`.
+   named exports only, `verbatimModuleSyntax`. Node `>=22`.
 2. **No framework tooling.** No Express/Hono/Fastify/Nest middleware, no HTTP layer,
    no auth, no sessions, no JWT/OAuth. Ever. The app owns all of it.
 3. **The `tsbouncer` root entry has zero dependencies and zero `node:*` imports.**
@@ -45,7 +45,7 @@ docs/                    Astro 7 docs site; every snippet is type-checked
 ```
 
 `docs/` is **not** part of the published surface and nothing in `packages/` depends
-on it. It needs Node 22 (Astro's floor) while the library supports `>=20.11`, so
+on it. It needs Node 22.12 (Astro's floor) while the library supports `>=22`, so
 `pnpm build` and `pnpm test` filter it out and CI builds it separately.
 
 `testkit` is the primary quality gate — there is no CLI. **Any new store must pass

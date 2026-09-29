@@ -22,8 +22,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        # 22 and 24 only, per maintainer decision. Note `engines` still
-        # advertises >=20.11 — the floor is claimed, not CI-verified.
+        # The maintained majors. `engines` claims >=22, so the floor is
+        # a tested version, not just a channel.
         node: ['22', '24']
 
     steps:
@@ -99,7 +99,7 @@ jobs:
 
   docs:
     name: docs
-    # Astro 7 requires Node 22. The library publishes `engines: >=20.11`, and the
+    # The docs toolchain needs Node 22.12 (Astro 7). The library publishes `engines: >=22`, and the
     # docs toolchain must not drag that floor up — so this is a separate job on a
     # separate runtime rather than a change to the main one.
     runs-on: ubuntu-latest
