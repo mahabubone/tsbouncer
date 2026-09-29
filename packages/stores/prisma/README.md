@@ -113,4 +113,4 @@ async callback is the normal Prisma 7 shape.
 
 ## License
 
-MIT
+[Apache-2.0](./LICENSE)

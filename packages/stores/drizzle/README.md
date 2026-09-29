@@ -100,4 +100,4 @@ on either driver kind.
 
 ## License
 
-MIT
+[Apache-2.0](./LICENSE)

@@ -1,9 +1,10 @@
-import type { Tuple } from '@tsbouncer/core';
+import type { Tuple } from 'tsbouncer';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   drizzleStore,
   mysqlTsbouncerTuples,
   pgTsbouncerTuples,
+  rowToTuple,
   sqliteTsbouncerTuples,
 } from '../src/index.js';
 import { createDb, type Handle } from './db.js';
@@ -207,6 +208,34 @@ describe('table factories', () => {
       expect(table.context?.notNull).toBe(false);
     }
   });
+
+  it('keeps the MySQL unique index inside InnoDB key limit', () => {
+    const table = mysqlTsbouncerTuples() as unknown as Record<
+      string,
+      { columnType?: string; length?: number } | undefined
+    >;
+    const keyFields = [
+      'subjectType',
+      'subjectId',
+      'subjectRelation',
+      'relation',
+      'resourceType',
+      'resourceId',
+      'condition',
+    ] as const;
+
+    // A TEXT column in a key needs a prefix length (ERROR 1170), and a prefix
+    // would make uniqueness approximate. Every key column must be a bounded
+    // varchar.
+    for (const field of keyFields) {
+      expect(table[field]?.columnType, `${field} must be a varchar`).toBe('MySqlVarChar');
+    }
+
+    // utf8mb4, the default and the worst case, is four bytes per character.
+    const bytes =
+      keyFields.reduce((sum, field) => sum + (table[field]?.length ?? 0), 0) * 4;
+    expect(bytes, 'unique index size').toBeLessThanOrEqual(3072);
+  });
 });
 
 describe('driver detection', () => {
@@ -252,5 +281,134 @@ describe('error surfaces', () => {
     await expect(
       s.write({ tuples: [T('user:a', 'viewer', 'document:1')], mode: 'upsert' }),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe('a write spanning several batches', () => {
+  it('gives each conflicting row its own context', async () => {
+    const s = store();
+    const a = { ...T('user:a', 'viewer', 'document:1'), condition: 'inRegion' };
+    const b = { ...T('user:b', 'viewer', 'document:2'), condition: 'inRegion' };
+    await s.write({
+      tuples: [
+        { ...a, context: { v: 1 } },
+        { ...b, context: { v: 2 } },
+      ],
+    });
+
+    await s.write({
+      tuples: [
+        { ...a, context: { v: 100 } },
+        { ...b, context: { v: 200 } },
+      ],
+      mode: 'upsert',
+    });
+
+    const bySubject = new Map((await s.read()).items.map((t) => [t.subject, t.context]));
+    expect(bySubject.get('user:a')).toEqual({ v: 100 });
+    expect(bySubject.get('user:b')).toEqual({ v: 200 });
+  });
+
+  it('names the one-param-set rule when a re-binding collides', async () => {
+    const s = store();
+    const base = {
+      ...T('user:alice', 'viewer', 'document:1'),
+      condition: 'inRegion',
+    };
+    await s.write({ tuples: [{ ...base, context: { region: 'eu' } }] });
+    await expect(
+      s.write({ tuples: [{ ...base, context: { region: 'us' } }] }),
+    ).rejects.toThrow(/one param-set/);
+  });
+
+  it('commits none of its batches when one fails', async () => {
+    const s = drizzleStore(handle.db, handle.tuples, { batchSize: 1 });
+    await s.write({ tuples: [T('user:alice', 'viewer', 'document:1')] });
+
+    await expect(
+      s.write({
+        tuples: [
+          T('user:d1', 'viewer', 'document:1'),
+          T('user:d2', 'viewer', 'document:1'),
+          T('user:alice', 'viewer', 'document:1'),
+        ],
+      }),
+    ).rejects.toThrow(/unique/);
+
+    expect((await s.read()).items.map((t) => t.subject).sort()).toEqual(['user:alice']);
+  });
+});
+
+describe('driver detection', () => {
+  it('reads a client exposing both prepare and execute as asynchronous', async () => {
+    const fake = {
+      $client: { prepare: () => undefined, execute: () => undefined },
+      select: () => ({
+        from: () => ({
+          all: () => {
+            throw new Error('took the synchronous path');
+          },
+          execute: async () => [],
+        }),
+      }),
+    };
+    await expect(drizzleStore(fake, handle.tuples).read()).resolves.toEqual({
+      items: [],
+    });
+  });
+
+  it('reads a prepare-only client as synchronous', async () => {
+    const fake = {
+      $client: { prepare: () => undefined },
+      select: () => ({
+        from: () => ({
+          all: () => [],
+          execute: async () => {
+            throw new Error('took the asynchronous path');
+          },
+        }),
+      }),
+    };
+    await expect(drizzleStore(fake, handle.tuples).read()).resolves.toEqual({
+      items: [],
+    });
+  });
+
+  it('refuses a client it cannot classify', () => {
+    expect(() => drizzleStore({ $client: {} }, handle.tuples)).toThrow(
+      /unrecognised database client/,
+    );
+  });
+
+  it('names the missing table argument rather than failing in SQL', () => {
+    expect(() =>
+      drizzleStore(handle.db, undefined as unknown as typeof handle.tuples),
+    ).toThrow(/second argument is the table object/);
+  });
+});
+
+// The table contract stores `''` for an absent optional column, and only the
+// contract's own DDL guarantees it. Against a schema that allowed NULL the row
+// would decode as `user:alice#null` — a reference no subject filter matches and
+// no delete-by-subject reaches, so the row would be permanent and invisible.
+describe('row decoding', () => {
+  it('reads a NULL optional column as absent rather than as a relation name', () => {
+    const fields = {
+      subjectType: 'user',
+      subjectId: 'alice',
+      subjectRelation: null as unknown as string,
+      relation: 'viewer',
+      resourceType: 'document',
+      resourceId: '1',
+      condition: null as unknown as string,
+      context: null,
+    };
+    expect(rowToTuple(fields as never)).toEqual({
+      subject: 'user:alice',
+      relation: 'viewer',
+      resource: 'document:1',
+      condition: undefined,
+      context: undefined,
+    });
   });
 });

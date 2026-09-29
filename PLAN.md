@@ -8,7 +8,7 @@
 | Area | Decision |
 |---|---|
 | Name | `tsbouncer` + `@tsbouncer/*` (both verified free on npm) |
-| License | MIT, public |
+| License | Apache-2.0, public |
 | Module system | **ESM-only.** No CJS, no dual build. Node `>=20.11` |
 | Model | Object literal + typed helpers, defined and validated **in code at runtime** |
 | Multi-tenancy | Opaque refs — tenancy is entirely the app's concern |
@@ -58,17 +58,21 @@ contract they implement is fixed, and every one of them is verified by the same 
 ```
 tsbouncer/
 ├─ packages/
-│  ├─ core/            @tsbouncer/core      zero deps, zero node:* imports
-│  ├─ stores/memory/   @tsbouncer/memory
-│  ├─ stores/json/     @tsbouncer/json      only package touching fs
+│  ├─ tsbouncer/       tsbouncer            kernel at `.`, `./memory`, `./json`, `./defaults`
+│  │                                         zero deps and zero node:* imports at the root;
+│  │                                         only `./json` touches fs
 │  ├─ stores/kysely/   @tsbouncer/kysely
 │  ├─ stores/drizzle/  @tsbouncer/drizzle
 │  ├─ stores/prisma/   @tsbouncer/prisma
-│  ├─ testkit/         @tsbouncer/testkit   conformance + golden suites
-│  └─ tsbouncer/       tsbouncer            batteries-included re-export
+│  └─ testkit/         @tsbouncer/testkit   conformance + golden suites
 ├─ examples/           hono-rbac · express-drizzle
 └─ pnpm-workspace.yaml
 ```
+
+The single-package shape is Phase 5.5, recorded below. `packages/core` and the
+`memory`/`json` store packages were folded into `tsbouncer` subpaths so an app
+never loads a backend it did not ask for; the SQL adapters stayed separate
+plugin packages with their names unchanged.
 
 **There is a docs site** (`docs/`, Astro 7 + Tailwind 4, static output). It is
 usage documentation and nothing else: `PLAN.md` remains the design record,
@@ -99,6 +103,8 @@ createAuthz({ model, store })
 //             check({subject,permission,resource}, {context}) -> Decision
 //             assert(...) -> throws AuthorizationError
 //             explain(...) -> { allowed, tree, ... }  |  format(e) -> string
+// limits      EvaluationRequest.limits · .budget   // one node budget per request
+//             EvaluationOutcome.truncated          // the budget ran out; partial
 // graph       expand({subject})
 //             listResources({subject,permission}) -> { resources, truncated }
 //             listSubjects({permission,resource}) -> SubjectSet { allOfTypes, members, excluded, truncated }
@@ -309,11 +315,12 @@ was found rather than by design:
 
 ## Release state
 
-All eight packages carry `1.0.0-dev.0` and `pnpm versions` fails the build if they
+All five packages carry `1.0.0-preview.1` and `pnpm versions` fails the build if they
 drift. There is no publish automation and none is planned yet: the release is a
-hand-cut `npm publish` per package plus a git tag. That is deliberate while the API
-is still moving — a changelog tool that computes versions from commit messages
-would give a false impression of a settled API.
+hand-cut publish in dependency order plus a git tag, exactly as
+[CONTRIBUTING.md](./CONTRIBUTING.md#cutting-a-release) prescribes. That is deliberate
+while the API is still moving — a changelog tool that computes versions from commit
+messages would give a false impression of a settled API.
 
 Postgres and MySQL are **not** tested. `DIALECTS` claims all three and only SQLite
 and libsql run in CI, so "swap adapters without migrating data" is verified across
@@ -325,4 +332,46 @@ project does not want to spend CI minutes on yet.
 
 `git init` · add `LICENSE` (doesn't exist yet) · fill the 0-byte stubs (`README`, `AGENTS`, `CHANGELOG`, `CONTRIBUTING`, `SECURITY`, `.gitignore`, `.node-version`) · ~~rename the directory `keyman` -> `tsbouncer`~~ **done** · ~~rename the `KeymanStore` / `KeymanStoreCapabilities` types~~ **done**, they are `TupleStore` / `TupleStoreCapabilities`.
 
-**Housekeeping:** `IDEA.md` contradicts the plan in three places — `@Keyman/*` naming (§17, §18), the optional `check?` store contract (§12), and the CLI (§16, §19). It stays as the origin story, and it now **carries a header saying so**, listing those three reversals and pointing at this file. A stale design doc that disagrees with the code is worse than no design doc; a banner that names the disagreement is the cheap fix. `docs/architecture.md` is not being written — the locked decisions are recorded here, and the usage documentation is the examples, which the site's `guides` section links to file by file.
+**Housekeeping:** `IDEA.md` contradicts the plan in three places — `@Keyman/*` naming (§17, §18), the optional `check?` store contract (§12), and the CLI (§16, §19). It stays as the origin story, and it now **carries a header saying so**, listing those three reversals and pointing at this file. A stale design doc that disagrees with the code is worse than no design doc; a banner that names the disagreement is the cheap fix. `docs/architecture.md` is not being written — the locked decisions are recorded here, the usage documentation is the guides (self-contained install → code → verify tutorials), and the runnable counterparts live in `examples/` and run in CI.
+
+## Settling toward v1 — audit-driven close-out (2026-09-29, now `1.0.0-preview.1`)
+
+A review of the `tsbouncer` package against the comparison catalog
+(`docs/src/content/docs/reference/comparison.mdx`) produced six findings, reproduced
+against running code. Settling v1 means fixing or disclosing all six, then staging
+for publish. CI / publish / provenance automation is explicitly deferred until the
+staged state is marked ready.
+
+Locked decisions (no relitigation without editing this section first):
+
+| # | Decision |
+|---|---|
+| F1 | Tuple identity stays `(subject, relation, resource, condition-name)` — bound `context` params are **not** part of the key. One edge holds one param-set per condition; a second binding is rejected with an actionable error, and the rule is documented. |
+| F2 | `expand` becomes condition-aware: it threads an optional request `context` and gates membership tuples the same way `listSubjects` does, instead of remaining a pure membership closure. |
+| F3 | `Decision` and `ExplainResult` gain `truncated: boolean`, forwarded from `EvaluationOutcome`. Additive only. |
+| F5 | `tupleKey` uses an unambiguous encoding (no `'|'`-joined fields). SQL stores are unaffected (separate columns). |
+| F6 | The full-store scan behind `listResources` and the materialized result lists are disclosed; the query layer honours `limit`/`cursor` where it does not change semantics. Full streaming lists are v1.1, with a filed issue. |
+| F4 | The comparison's transactional-reads story is scoped to the kernel + SQL adapters — the `tsbouncer/memory` and `tsbouncer/json` stores are non-transactional. Docs-only. |
+
+Phases: **0** lock semantics here (this section) → **1** F3 + F5 with tests → **2** F1 error message + contract clause + docs → **3** F2 context threading + `expand`↔`check` agreement test → **4** F6 disclosure + `limit`/`cursor` groundwork → **5** comparison page + docs sync (incl. F4) with `docs:test` / `docs:build` / link check → **6** settle gates (`lint`, `versions`, `typecheck`, `build`, `pack:check`, `test:coverage` 90% gate, `examples`, testkit green on all five stores, regenerated contract report) plus `CHANGELOG.md` entry and a written hand-cut publish/tag procedure. Phases 1–2 and 3–4 are independent after Phase 0 and may run as parallel workstreams.
+
+**Deferred to v1.1 (F6 remainder).** `listResources` / `expand` return materialized
+arrays; there is no streaming or async-iterable form, and evaluator reads stay
+unpaged by design (a partial page inside `check` would decide on incomplete data).
+The v1 groundwork — a capability-gated cursor loop for the set-grant scan, with a
+test proving a paged scan answers identically to an unpaged one — is the consumer
+a streaming implementation will build on. There is no issue tracker for this repo
+yet (no remote), so this paragraph is the filing until there is.
+
+## Phase 5.5 — site IA, single-package shape, preview versioning (locked 2026-09-29)
+
+No changesets, no CI/release pipelines in this phase — those start only after the
+staged state is marked ready. This phase restructures and stages.
+
+| # | Decision |
+|---|---|
+| Site | New marketing landing at `/`; all docs under `/docs/*`; current intro becomes `/docs`. Static output, served from GitHub Pages as a **project subpath** (`base: '/tsbouncer/'`, assuming the `tsbouncer/tsbouncer` repo path — revisit if the org differs). |
+| Links | Absolute internal links do not survive Astro `base`, so content links go relative, components/layout use `BASE_URL`, and the snippet/link checkers resolve the `/docs/*` routes. |
+| Package | **One `tsbouncer`**: the kernel (today's `@tsbouncer/core`) at `.`, `./memory`, `./json`, `./defaults` (`createDefaultAuthz`); adapters stay separate plugin packages **with current names** (`@tsbouncer/kysely`, …); `@tsbouncer/testkit` stays separate. Root never pulls `fs` — `jsonStore` lives behind `./json` only. |
+| Version | Preview chain `1.0.0-preview.N` (`.1`, `.2`, … — plain numeric identifiers, so precedence stays chronological; month names would sort lexically and break it), single version enforced everywhere as today. The `v` prefix lives on git tags only, never in `package.json`. Final is `1.0.0`. |
+| Deploy | Pages deploy automation is deferred with the other pipes; this phase proves the SSG output (`docs:build` under `base`) and documents the manual publish steps. |

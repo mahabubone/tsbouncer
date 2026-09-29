@@ -6,8 +6,8 @@ import type {
   TupleStore,
   TupleStoreCapabilities,
   WriteInput,
-} from '@tsbouncer/core';
-import { formatRef, parseRef, StoreError } from '@tsbouncer/core';
+} from 'tsbouncer';
+import { formatRef, parseRef, StoreError } from 'tsbouncer';
 import { DEFAULT_MODEL, KEY_FIELDS, NULL_ABSENT } from './schema.js';
 
 export { DEFAULT_MODEL, KEY_FIELDS, MODEL_DDL, NULL_ABSENT } from './schema.js';
@@ -63,66 +63,123 @@ export function prismaStore(
   prisma: PrismaClient,
   options: PrismaStoreOptions = {},
 ): TupleStore {
+  if (prisma === undefined || prisma === null) {
+    throw new TypeError('prismaStore: the first argument is your Prisma client.');
+  }
+
   const model = options.model ?? DEFAULT_MODEL;
+  // Prisma answers an unknown model with `TypeError: Cannot read properties of
+  // undefined (reading 'findMany')` from somewhere deep inside the first query.
+  // The delegate is either there or it is not, so the caller can be told now.
+  if (prisma[model] === undefined || prisma[model] === null) {
+    throw new TypeError(
+      `prismaStore: this Prisma client has no model "${model}". Pass \`model\` in the options if yours is named differently.`,
+    );
+  }
   const delegate = (client: PrismaClient): PrismaClient => client[model];
   const uniqueKeyName = options.uniqueKeyName ?? KEY_FIELDS.join('_');
   const batchSize = options.batchSize ?? DEFAULT_BATCH;
 
   async function read(query: ReadTupleQuery = {}): Promise<Page<Tuple>> {
-    const where: Filter = { AND: filtersFor(query) };
-    const rows = (await delegate(prisma).findMany({
-      where,
-      take: query.limit,
-    })) as TupleRow[];
-    return Object.freeze({ items: Object.freeze(rows.map(rowToTuple)) });
+    // `take: 0` and `take: -1` are both nonsense, and the providers disagree
+    // about what they mean. An empty page is the only answer that needs no
+    // interpretation.
+    if (query.limit !== undefined && query.limit <= 0) {
+      return Object.freeze({ items: Object.freeze([] as Tuple[]) });
+    }
+
+    try {
+      const where: Filter = { AND: filtersFor(query) };
+      const rows = (await delegate(prisma).findMany({
+        where,
+        take: query.limit,
+      })) as TupleRow[];
+      return Object.freeze({ items: Object.freeze(rows.map(rowToTuple)) });
+    } catch (cause) {
+      if (cause instanceof StoreError) throw cause;
+      throw new StoreError('read failed', { cause });
+    }
   }
 
   async function write(input: WriteInput): Promise<void> {
     if (input.tuples.length === 0) return;
     const mode = input.mode ?? 'insert';
-    const rows = input.tuples.map(tupleToRow);
+    const batches = [...chunked(input.tuples.map(tupleToRow), batchSize)];
 
-    for (const batch of chunked(rows, batchSize)) {
-      try {
-        if (mode === 'insert') {
-          // `skipDuplicates: false` is the default, so a key collision raises
-          // and the whole createMany fails. That is what `insert` mode means.
-          await delegate(prisma).createMany({ data: batch });
-        } else {
-          await upsertEach(prisma, delegate, batch, uniqueKeyName);
-        }
-      } catch (cause) {
-        throw new StoreError(describeFailure(mode), { cause });
+    const apply = async (
+      client: PrismaClient,
+      batch: readonly TupleRow[],
+    ): Promise<void> => {
+      if (mode === 'insert') {
+        // `skipDuplicates: false` is the default, so a key collision raises
+        // and the whole createMany fails. That is what `insert` mode means.
+        await delegate(client).createMany({ data: batch });
+        return;
       }
+      await upsertEach(client, delegate, batch, uniqueKeyName);
+    };
+
+    try {
+      // `createMany` is atomic for one batch; `upsert` is one statement per row.
+      // Past a single statement, issuing them in sequence with nothing between
+      // them means a failure partway leaves the earlier ones committed — for
+      // `replace` and multi-batch writes, the caller sees an error and has no
+      // way to know what landed.
+      const statements = mode === 'insert' ? batches.length : input.tuples.length;
+      if (statements <= 1) {
+        await apply(prisma, batches[0] as readonly TupleRow[]);
+        return;
+      }
+      await prisma.$transaction(async (tx: PrismaClient) => {
+        for (const batch of batches) await apply(tx, batch);
+      });
+    } catch (cause) {
+      if (cause instanceof StoreError) throw cause;
+      throw new StoreError(describeFailure(mode, cause), { cause });
     }
   }
 
   async function remove(input: DeleteInput): Promise<void> {
-    if (input.kind === 'tuples') {
-      const rows = input.tuples.map(tupleToRow);
-      for (const batch of chunked(rows, batchSize)) {
-        await delegate(prisma).deleteMany({
-          where: { OR: batch.map((row) => keyFilter(row)) },
+    try {
+      if (input.kind === 'tuples') {
+        const batches = [...chunked(input.tuples.map(tupleToRow), batchSize)];
+        const apply = async (
+          client: PrismaClient,
+          batch: readonly TupleRow[],
+        ): Promise<void> => {
+          await delegate(client).deleteMany({
+            where: { OR: batch.map((row) => keyFilter(row)) },
+          });
+        };
+        if (batches.length === 1) {
+          await apply(prisma, batches[0] as readonly TupleRow[]);
+          return;
+        }
+        await prisma.$transaction(async (tx: PrismaClient) => {
+          for (const batch of batches) await apply(tx, batch);
         });
+        return;
       }
-      return;
-    }
 
-    if (input.kind === 'filter') {
-      await delegate(prisma).deleteMany({ where: { AND: filtersFor(input.query) } });
-      return;
-    }
-
-    // Prisma has no interactive-transaction callback that both drivers accept
-    // the same way, so the replace is a sequence inside `$transaction`, which is
-    // atomic by contract and portable across every provider.
-    const rows = input.tuples.map(tupleToRow);
-    await prisma.$transaction(async (tx: PrismaClient) => {
-      await delegate(tx).deleteMany({ where: { AND: filtersFor(input.query) } });
-      for (const batch of chunked(rows, batchSize)) {
-        await delegate(tx).createMany({ data: batch });
+      if (input.kind === 'filter') {
+        await delegate(prisma).deleteMany({ where: { AND: filtersFor(input.query) } });
+        return;
       }
-    });
+
+      // Prisma has no interactive-transaction callback that both drivers accept
+      // the same way, so the replace is a sequence inside `$transaction`, which is
+      // atomic by contract and portable across every provider.
+      const rows = input.tuples.map(tupleToRow);
+      await prisma.$transaction(async (tx: PrismaClient) => {
+        await delegate(tx).deleteMany({ where: { AND: filtersFor(input.query) } });
+        for (const batch of chunked(rows, batchSize)) {
+          await delegate(tx).createMany({ data: batch });
+        }
+      });
+    } catch (cause) {
+      if (cause instanceof StoreError) throw cause;
+      throw new StoreError('delete failed', { cause });
+    }
   }
 
   return Object.freeze({ capabilities: CAPABILITIES, read, write, delete: remove });
@@ -181,10 +238,17 @@ export function tupleToRow(tuple: Tuple): TupleRow {
 }
 
 export function rowToTuple(row: TupleRow): Tuple {
+  // `subject_relation` and `condition` are `''` when absent *by contract*. A row
+  // written by a schema that allowed NULL would otherwise be rendered
+  // `user:alice#null`, a reference that matches no filter and cannot be deleted
+  // by one — so `null` is read as absent rather than as a relation name.
   const subject = formatRef({
     type: row.subjectType,
     id: row.subjectId,
-    relation: row.subjectRelation === NULL_ABSENT ? undefined : row.subjectRelation,
+    relation:
+      row.subjectRelation == null || row.subjectRelation === NULL_ABSENT
+        ? undefined
+        : row.subjectRelation,
   });
 
   let context: Record<string, unknown> | undefined;
@@ -200,7 +264,8 @@ export function rowToTuple(row: TupleRow): Tuple {
     subject,
     relation: row.relation,
     resource: formatRef({ type: row.resourceType, id: row.resourceId }),
-    condition: row.condition === NULL_ABSENT ? undefined : row.condition,
+    condition:
+      row.condition == null || row.condition === NULL_ABSENT ? undefined : row.condition,
     context,
   });
 }
@@ -213,12 +278,18 @@ export function rowToTuple(row: TupleRow): Tuple {
  * A reference spans three fields, so a set of references is an OR of
  * per-reference conjunctions. Independent `in` filters per field would match a
  * row pairing one reference's type with another's id.
+ *
+ * An **empty** set has to be written out: Prisma reads `OR: []` as "no
+ * condition", so `read({ subject: [] })` matched every row and
+ * `delete({ subject: [] })` emptied the table. `in: []` matches nothing on
+ * every provider.
  */
 function refFilter(
   filter: string | readonly string[],
   prefix: 'subject' | 'resource',
 ): Filter {
   const values = typeof filter === 'string' ? [filter] : filter;
+  if (values.length === 0) return { [`${prefix}Type`]: { in: [] } };
   const position = prefix === 'subject' ? 'subject' : 'object';
 
   return {
@@ -239,7 +310,8 @@ function filtersFor(query: ReadTupleQuery): Filter[] {
   if (query.subject !== undefined) terms.push(refFilter(query.subject, 'subject'));
   if (query.relation !== undefined) {
     const values = typeof query.relation === 'string' ? [query.relation] : query.relation;
-    terms.push({ relation: { in: [...values] } });
+    if (values.length === 0) terms.push({ relation: { in: [] } });
+    else terms.push({ relation: { in: [...values] } });
   }
   if (query.resource !== undefined) terms.push(refFilter(query.resource, 'resource'));
   return terms;
@@ -261,8 +333,34 @@ function* chunked<T>(items: readonly T[], size: number): Generator<T[]> {
   }
 }
 
-function describeFailure(mode: string): string {
-  return mode === 'insert'
-    ? 'write rejected by a unique constraint — a tuple with this key already exists'
-    : 'upsert failed';
+/**
+ * The message for a failed write.
+ *
+ * It used to claim a unique constraint on every insert failure, so a connection
+ * that dropped mid-batch was reported as "a tuple with this key already exists".
+ * The claim is made only when the driver actually reported one — Prisma `P2002`,
+ * SQLite `UNIQUE constraint failed`, Postgres `23505`, MySQL `ER_DUP_ENTRY` —
+ * and the original error stays on `cause` either way.
+ */
+function describeFailure(mode: string, cause: unknown): string {
+  if (isUniqueViolation(cause)) {
+    return (
+      'write rejected by a unique constraint — a tuple with this key already exists. ' +
+      "One edge holds one param-set per condition: re-binding the same edge and condition needs mode 'upsert'."
+    );
+  }
+  return mode === 'insert' ? 'write failed' : 'upsert failed';
+}
+
+function isUniqueViolation(cause: unknown): boolean {
+  let current: unknown = cause;
+  for (let depth = 0; current !== undefined && current !== null && depth < 8; depth++) {
+    const error = current as { code?: unknown; errno?: unknown; message?: unknown };
+    const haystack =
+      `${error.code ?? ''} ${error.errno ?? ''} ${error.message ?? ''}`.toLowerCase();
+    if (/p2002|unique constraint|dup_entry|duplicate (key|entry)|23505/.test(haystack))
+      return true;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return false;
 }

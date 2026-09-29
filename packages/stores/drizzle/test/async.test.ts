@@ -1,4 +1,4 @@
-import type { Tuple } from '@tsbouncer/core';
+import type { Tuple } from 'tsbouncer';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { drizzleStore } from '../src/index.js';
 import { createAsyncDb, ensureTable, type Handle } from './async-db.js';

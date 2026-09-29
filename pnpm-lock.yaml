@@ -42,9 +42,6 @@ importers:
       '@tailwindcss/vite':
         specifier: 4.3.3
         version: 4.3.3(vite@8.3.1(@types/node@24.10.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
-      '@tsbouncer/core':
-        specifier: workspace:*
-        version: link:../packages/core
       '@tsbouncer/kysely':
         specifier: workspace:*
         version: link:../packages/stores/kysely
@@ -63,6 +60,9 @@ importers:
       tsbouncer:
         specifier: workspace:*
         version: link:../packages/tsbouncer
+      tsx:
+        specifier: 4.23.15
+        version: 4.23.15
       typescript:
         specifier: 5.9.3
         version: 5.9.3
@@ -72,9 +72,6 @@ importers:
 
   examples/express-drizzle:
     dependencies:
-      '@tsbouncer/core':
-        specifier: workspace:*
-        version: link:../../packages/core
       '@tsbouncer/drizzle':
         specifier: workspace:*
         version: link:../../packages/stores/drizzle
@@ -100,6 +97,9 @@ importers:
       '@types/node':
         specifier: 26.6.3
         version: 26.6.3
+      '@vitest/coverage-v8':
+        specifier: 5.0.2
+        version: 5.0.2(vitest@5.0.2)
       tsx:
         specifier: 4.23.15
         version: 4.23.15
@@ -125,6 +125,9 @@ importers:
       '@types/node':
         specifier: 26.6.3
         version: 26.6.3
+      '@vitest/coverage-v8':
+        specifier: 5.0.2
+        version: 5.0.2(vitest@5.0.2)
       tsx:
         specifier: 4.23.15
         version: 4.23.15
@@ -135,32 +138,11 @@ importers:
         specifier: 5.0.2
         version: 5.0.2(@types/node@26.6.3)(@vitest/coverage-v8@5.0.2)(vite@8.3.1(@types/node@26.6.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
 
-  packages/core:
-    devDependencies:
-      '@arethetypeswrong/cli':
-        specifier: 0.18.5
-        version: 0.18.5
-      '@vitest/coverage-v8':
-        specifier: 5.0.2
-        version: 5.0.2(vitest@5.0.2)
-      publint:
-        specifier: 0.3.24
-        version: 0.3.24
-      tsup:
-        specifier: 8.5.1
-        version: 8.5.1(jiti@2.7.0)(postcss@8.5.28)(tsx@4.23.15)(typescript@5.9.3)
-      typescript:
-        specifier: 5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: 5.0.2
-        version: 5.0.2(@types/node@26.6.3)(@vitest/coverage-v8@5.0.2)(vite@8.3.1(@types/node@26.6.3)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.23.15))
-
   packages/stores/drizzle:
     dependencies:
-      '@tsbouncer/core':
+      tsbouncer:
         specifier: workspace:*
-        version: link:../../core
+        version: link:../../tsbouncer
     devDependencies:
       '@arethetypeswrong/cli':
         specifier: 0.18.5
@@ -194,44 +176,13 @@ importers:
         version: 5.9.3
       vitest:
         specifier: 5.0.2
-        version: 5.0.2(@types/node@26.6.3)(@vitest/coverage-v8@5.0.2)(vite@8.3.1(@types/node@26.6.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
-
-  packages/stores/json:
-    dependencies:
-      '@tsbouncer/core':
-        specifier: workspace:*
-        version: link:../../core
-    devDependencies:
-      '@arethetypeswrong/cli':
-        specifier: 0.18.5
-        version: 0.18.5
-      '@tsbouncer/testkit':
-        specifier: workspace:*
-        version: link:../../testkit
-      '@types/node':
-        specifier: 26.6.3
-        version: 26.6.3
-      '@vitest/coverage-v8':
-        specifier: 5.0.2
-        version: 5.0.2(vitest@5.0.2)
-      publint:
-        specifier: 0.3.24
-        version: 0.3.24
-      tsup:
-        specifier: 8.5.1
-        version: 8.5.1(jiti@2.7.0)(postcss@8.5.28)(tsx@4.23.15)(typescript@5.9.3)
-      typescript:
-        specifier: 5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: 5.0.2
-        version: 5.0.2(@types/node@26.6.3)(@vitest/coverage-v8@5.0.2)(vite@8.3.1(@types/node@26.6.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
+        version: 5.0.2(@types/node@26.6.3)(@vitest/coverage-v8@5.0.2)(vite@8.3.1(@types/node@26.6.3)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.23.15))
 
   packages/stores/kysely:
     dependencies:
-      '@tsbouncer/core':
+      tsbouncer:
         specifier: workspace:*
-        version: link:../../core
+        version: link:../../tsbouncer
     devDependencies:
       '@arethetypeswrong/cli':
         specifier: 0.18.5
@@ -264,39 +215,11 @@ importers:
         specifier: 5.0.2
         version: 5.0.2(@types/node@26.6.3)(@vitest/coverage-v8@5.0.2)(vite@8.3.1(@types/node@26.6.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
 
-  packages/stores/memory:
-    dependencies:
-      '@tsbouncer/core':
-        specifier: workspace:*
-        version: link:../../core
-    devDependencies:
-      '@arethetypeswrong/cli':
-        specifier: 0.18.5
-        version: 0.18.5
-      '@tsbouncer/testkit':
-        specifier: workspace:*
-        version: link:../../testkit
-      '@vitest/coverage-v8':
-        specifier: 5.0.2
-        version: 5.0.2(vitest@5.0.2)
-      publint:
-        specifier: 0.3.24
-        version: 0.3.24
-      tsup:
-        specifier: 8.5.1
-        version: 8.5.1(jiti@2.7.0)(postcss@8.5.28)(tsx@4.23.15)(typescript@5.9.3)
-      typescript:
-        specifier: 5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: 5.0.2
-        version: 5.0.2(@types/node@26.6.3)(@vitest/coverage-v8@5.0.2)(vite@8.3.1(@types/node@26.6.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
-
   packages/stores/prisma:
     dependencies:
-      '@tsbouncer/core':
+      tsbouncer:
         specifier: workspace:*
-        version: link:../../core
+        version: link:../../tsbouncer
     devDependencies:
       '@arethetypeswrong/cli':
         specifier: 0.18.5
@@ -337,10 +260,19 @@ importers:
 
   packages/testkit:
     dependencies:
-      '@tsbouncer/core':
+      tsbouncer:
         specifier: workspace:*
-        version: link:../core
+        version: link:../tsbouncer
     devDependencies:
+      '@arethetypeswrong/cli':
+        specifier: 0.18.5
+        version: 0.18.5
+      '@vitest/coverage-v8':
+        specifier: 5.0.2
+        version: 5.0.2(vitest@5.0.2)
+      publint:
+        specifier: 0.3.24
+        version: 0.3.24
       tsup:
         specifier: 8.5.1
         version: 8.5.1(jiti@2.7.0)(postcss@8.5.28)(tsx@4.23.15)(typescript@5.9.3)
@@ -352,20 +284,13 @@ importers:
         version: 5.0.2(@types/node@26.6.3)(@vitest/coverage-v8@5.0.2)(vite@8.3.1(@types/node@26.6.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
 
   packages/tsbouncer:
-    dependencies:
-      '@tsbouncer/core':
-        specifier: workspace:*
-        version: link:../core
-      '@tsbouncer/json':
-        specifier: workspace:*
-        version: link:../stores/json
-      '@tsbouncer/memory':
-        specifier: workspace:*
-        version: link:../stores/memory
     devDependencies:
       '@arethetypeswrong/cli':
         specifier: 0.18.5
         version: 0.18.5
+      '@tsbouncer/testkit':
+        specifier: workspace:*
+        version: link:../testkit
       '@types/node':
         specifier: 26.6.3
         version: 26.6.3

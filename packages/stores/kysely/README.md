@@ -86,4 +86,4 @@ low-volume; if throughput ever becomes the problem, branch per driver.
 
 ## License
 
-MIT
+[Apache-2.0](./LICENSE)

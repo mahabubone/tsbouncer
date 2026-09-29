@@ -1,4 +1,4 @@
-import type { Tuple, TupleStore } from '@tsbouncer/core';
+import type { Tuple, TupleStore } from 'tsbouncer';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 export interface ConformanceOptions {
@@ -158,6 +158,19 @@ export function storeConformance(options: ConformanceOptions): void {
         expect((await read({ relation: 'viewer' })).length).toBe(3);
         expect((await read({})).length).toBe(4);
       });
+
+      // An empty set is "matches nothing", never "no condition". Drizzle and
+      // Prisma both read it as the latter: `or()` with no arguments becomes
+      // `undefined` and drops out of the WHERE clause, and `OR: []` is a no-op
+      // filter, so the whole table came back. That is a fail-open read sitting
+      // one refactor away from the evaluator, so every store answers it here.
+      it('treats an empty value list as matching nothing', async () => {
+        await seed();
+        expect(await read({ subject: [] })).toEqual([]);
+        expect(await read({ relation: [] })).toEqual([]);
+        expect(await read({ resource: [] })).toEqual([]);
+        expect(await read({ subject: [], relation: [] })).toEqual([]);
+      });
     });
 
     // -- write -------------------------------------------------------------
@@ -177,6 +190,24 @@ export function storeConformance(options: ConformanceOptions): void {
         await store.write({ tuples: [ALICE] });
         await expect(store.write({ tuples: [ALICE] })).rejects.toThrow();
         expect((await read()).length).toBe(1);
+      });
+
+      // One edge holds one param-set per condition (PLAN.md, F1). A second
+      // binding on the same edge + condition is a rejection, not a second row —
+      // and the store must still hold the first binding afterwards. The message
+      // wording is asserted in each adapter's own tests; this suite pins the
+      // behavior, which is what every adapter has to share.
+      it('rejects a re-binding on insert mode', async () => {
+        const first: Tuple = {
+          ...ALICE,
+          condition: 'inRegion',
+          context: { region: 'eu' },
+        };
+        await store.write({ tuples: [first] });
+        await expect(
+          store.write({ tuples: [{ ...first, context: { region: 'us' } }] }),
+        ).rejects.toThrow();
+        expect(await read()).toEqual([first]);
       });
 
       it('replaces a tuple sharing a key on upsert mode', async () => {
@@ -199,6 +230,35 @@ export function storeConformance(options: ConformanceOptions): void {
         await store.write({ tuples: [ALICE] });
         await expect(store.write({ tuples: [BOB, ALICE] })).rejects.toThrow();
         expect(ids(await read())).toEqual(['user:alice#viewer@document:1']);
+      });
+
+      // A duplicate *inside* one insert is still a duplicate. SQLite and Prisma
+      // reject it through the unique index; a store that only checks the batch
+      // against what is already stored lets it through and silently keeps the
+      // later row, so the same call succeeds on one adapter and fails on another.
+      it('rejects a key that appears twice in one insert', async () => {
+        await expect(store.write({ tuples: [ALICE, ALICE] })).rejects.toThrow();
+        expect((await read()).length).toBe(0);
+      });
+
+      // `upsert` is last-wins across calls; the same rule has to hold for two
+      // rows of *one* call that share a key. Without it the stores disagree:
+      // memory and Prisma apply them in order, while Kysely and Drizzle hand
+      // both rows to one statement and the unique index rejects the pair —
+      // Postgres outright, with "cannot affect row a second time".
+      it('applies a repeated key in order when one call upserts it twice', async () => {
+        const base = { ...ALICE, condition: 'inRegion' };
+        await store.write({
+          tuples: [
+            { ...base, context: { region: 'eu' } },
+            { ...base, context: { region: 'us' } },
+          ],
+          mode: 'upsert',
+        });
+
+        const found = await read();
+        expect(found.length).toBe(1);
+        expect(found[0]?.context).toEqual({ region: 'us' });
       });
     });
 
@@ -224,6 +284,15 @@ export function storeConformance(options: ConformanceOptions): void {
         await seed();
         await store.delete({ kind: 'filter', query: { relation: 'viewer' } });
         expect(ids(await read())).toEqual(['user:carol#editor@document:1']);
+      });
+
+      // The same empty-set rule, on the destructive path. A store that reads
+      // `subject: []` as "no condition" here does not return the table — it
+      // empties it, while reporting success.
+      it('removes nothing when a filter is an empty value list', async () => {
+        await seed();
+        await store.delete({ kind: 'filter', query: { subject: [] } });
+        expect(ids(await read())).toEqual(ids(SEED));
       });
 
       it('replaces a filtered set atomically', async () => {

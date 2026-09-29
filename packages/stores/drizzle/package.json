@@ -1,12 +1,24 @@
 {
   "name": "@tsbouncer/drizzle",
-  "version": "1.0.0-dev.0",
+  "version": "1.0.0-preview.1",
   "description": "TupleStore over an application-owned Drizzle instance.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "engines": {
     "node": ">=20.11"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mahabubone/tsbouncer.git",
+    "directory": "packages/stores/drizzle"
+  },
+  "bugs": {
+    "url": "https://github.com/mahabubone/tsbouncer/issues"
+  },
+  "homepage": "https://github.com/mahabubone/tsbouncer/tree/main/packages/stores/drizzle#readme",
+  "publishConfig": {
+    "access": "public"
   },
   "exports": {
     ".": {
@@ -28,6 +40,7 @@
     "esm"
   ],
   "scripts": {
+    "prepublishOnly": "pnpm run build",
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -35,10 +48,10 @@
     "pack:check": "publint --strict && attw --pack . --profile esm-only"
   },
   "peerDependencies": {
-    "drizzle-orm": ">=0.36"
+    "drizzle-orm": ">=0.45.0 <0.46"
   },
   "dependencies": {
-    "@tsbouncer/core": "workspace:*"
+    "tsbouncer": "workspace:*"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",

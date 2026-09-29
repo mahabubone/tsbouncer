@@ -12,6 +12,11 @@ allowBuilds:
   prisma: true
   turbo: true
 
+# A release younger than a day is skipped, which is what makes the excludes
+# below meaningful: pnpm gates `minimumReleaseAgeExclude` on this setting, and
+# with the default of 0 every one of them was dead config.
+minimumReleaseAge: 1440
+
 minimumReleaseAgeExclude:
   - '@turbo/darwin-64@2.11.5'
   - '@turbo/darwin-arm64@2.11.5'

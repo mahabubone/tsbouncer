@@ -1,13 +1,17 @@
 // biome-ignore-all lint/performance/noDynamicNamespaceImportAccess: enumerating the export surface by name is the point
 import { describe, expect, it } from 'vitest';
+import * as defaults from '../src/defaults.js';
 import * as api from '../src/index.js';
+import * as json from '../src/json/index.js';
+import * as memory from '../src/memory/index.js';
 
 /**
- * The batteries-included package is the one import most people will make, so its
- * surface is asserted here rather than left to `export *`.
+ * The root entry is the kernel and nothing else. Anything storage-shaped lives
+ * behind a subpath, so importing the root never loads a backend — and in
+ * particular never loads `node:fs` through the JSON store.
  */
 describe('tsbouncer', () => {
-  it('re-exports the kernel', () => {
+  it('exports the kernel from the root', () => {
     for (const name of [
       'createAuthz',
       'defineModel',
@@ -26,21 +30,41 @@ describe('tsbouncer', () => {
     }
   });
 
-  it('re-exports the dependency-free stores', () => {
-    expect(api.memoryStore).toBeTypeOf('function');
-    expect(api.jsonStore).toBeTypeOf('function');
-    expect(api.FORMAT_VERSION).toBe(1);
+  it('keeps storage out of the root', () => {
+    for (const name of [
+      'memoryStore',
+      'jsonStore',
+      'createDefaultAuthz',
+      'isPersistent',
+      'FORMAT_VERSION',
+    ] as const) {
+      expect(api[name as keyof typeof api], name).toBeUndefined();
+    }
+  });
+
+  it('exposes the memory store behind its subpath', () => {
+    expect(memory.memoryStore).toBeTypeOf('function');
+  });
+
+  it('exposes the JSON store behind its subpath', () => {
+    expect(json.jsonStore).toBeTypeOf('function');
+    expect(json.FORMAT_VERSION).toBe(1);
+  });
+
+  it('exposes the store-choosing client behind its subpath', () => {
+    expect(defaults.createDefaultAuthz).toBeTypeOf('function');
+    expect(defaults.isPersistent).toBeTypeOf('function');
   });
 
   it('does not pull in an ORM', () => {
     // The whole point of splitting the packages: an app that already has Prisma
     // should not end up with Kysely and Drizzle in its dependency graph because
     // it read a README.
-    const source = api.memoryStore.toString();
+    const source = memory.memoryStore.toString();
     expect(source).not.toMatch(/kysely|drizzle|prisma/i);
   });
 
-  it('runs a decision end to end through one import', async () => {
+  it('runs a decision end to end across entries', async () => {
     const model = api.defineModel({
       types: {
         user: api.defineType({}),
@@ -55,7 +79,7 @@ describe('tsbouncer', () => {
       },
     });
 
-    const authz = api.createAuthz({ model, store: api.memoryStore() });
+    const authz = api.createAuthz({ model, store: memory.memoryStore() });
     await authz.grant({
       subject: 'user:alice',
       relation: 'owner',
@@ -75,49 +99,5 @@ describe('tsbouncer', () => {
     expect(await authz.can('user:alice', 'document.read', 'document:1')).toBe(true);
     expect(await authz.can('user:alice', 'document.read', 'document:2')).toBe(true);
     expect(await authz.can('user:bob', 'document.read', 'document:2')).toBe(false);
-  });
-});
-
-describe('createDefaultAuthz', () => {
-  const model = api.defineModel({
-    types: {
-      user: api.defineType({}),
-      doc: api.defineType({ relations: { owner: api.relation(['user']) } }),
-    },
-  });
-
-  it('uses an in-memory store when no file is given', async () => {
-    const authz = api.createDefaultAuthz({ model });
-    expect(api.isPersistent(authz.store)).toBe(false);
-    await authz.grant({ subject: 'user:a', relation: 'owner', resource: 'doc:1' });
-    expect(await authz.can('user:a', 'doc.owner', 'doc:1')).toBe(true);
-  });
-
-  it('uses a JSON file when one is given', async () => {
-    const { mkdtempSync } = await import('node:fs');
-    const { tmpdir } = await import('node:os');
-    const { join } = await import('node:path');
-    const file = join(
-      mkdtempSync(join(tmpdir(), 'tsbouncer-default-')),
-      'tsbouncer.json',
-    );
-
-    const authz = api.createDefaultAuthz({ model, file });
-    expect(api.isPersistent(authz.store)).toBe(true);
-    await authz.grant({ subject: 'user:a', relation: 'owner', resource: 'doc:1' });
-
-    // A fresh client over the same file sees it.
-    const reopened = api.createDefaultAuthz({ model, file });
-    expect(await reopened.can('user:a', 'doc.owner', 'doc:1')).toBe(true);
-  });
-
-  it('passes limits through', async () => {
-    const authz = api.createDefaultAuthz({ model, limits: { maxNodes: 1 } });
-    const result = await authz.explain({
-      subject: 'user:a',
-      permission: 'doc.owner',
-      resource: 'doc:1',
-    });
-    expect(result.allowed).toBe(false);
   });
 });

@@ -1,21 +1,19 @@
 /**
- * `tsbouncer` — the batteries-included entry point.
+ * `tsbouncer` — the kernel. Model, evaluator, queries, and the store contract.
  *
- * Re-exports the kernel plus the two stores that need no external dependency, so
- * the common case is one import and no database:
+ * This entry is deliberately lean: it pulls no storage and no `node:*` imports,
+ * so importing it never loads a backend you did not ask for. Reach further only
+ * on purpose:
  *
  * ```ts
- * import { createAuthz, defineModel, jsonStore } from 'tsbouncer';
+ * import { createAuthz, defineModel } from 'tsbouncer';
+ * import { memoryStore } from 'tsbouncer/memory';
+ * import { jsonStore } from 'tsbouncer/json';
+ * import { createDefaultAuthz } from 'tsbouncer/defaults';
  * ```
  *
- * If your app already has Kysely, Drizzle, or Prisma, import `@tsbouncer/core`
- * and the matching store instead — this package deliberately does not depend on
- * any of them, and neither should your install graph because you read a README.
+ * SQL adapters stay separate plugin packages (`@tsbouncer/kysely`,
+ * `@tsbouncer/drizzle`, `@tsbouncer/prisma`), and `@tsbouncer/testkit` holds
+ * the conformance suite. Nothing here depends on any of them.
  */
-export * from '@tsbouncer/core';
-export type { Document, JsonStore, JsonStoreOptions } from '@tsbouncer/json';
-export { FORMAT_VERSION, jsonStore } from '@tsbouncer/json';
-export type { MemoryStore, MemoryStoreOptions } from '@tsbouncer/memory';
-export { memoryStore } from '@tsbouncer/memory';
-export type { CreateDefaultAuthzOptions } from './default.js';
-export { createDefaultAuthz, isPersistent } from './default.js';
+export * from './kernel/index.js';

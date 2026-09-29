@@ -3,10 +3,6 @@ export type Dialect = (typeof DIALECTS)[number];
 
 export const TABLE = 'tsbouncer_tuples';
 
-export const TABLE_INDEX = 'tsbouncer_tuples_subject';
-export const TABLE_INDEX_TTU = 'tsbouncer_tuples_ttu';
-export const TABLE_INDEX_LIST = 'tsbouncer_tuples_list';
-
 /**
  * The column contract every SQL store shares.
  *
@@ -71,8 +67,20 @@ export function isDialect(value: string): value is Dialect {
 }
 
 function columnDefinitions(dialect: Dialect): string {
-  const long = dialect === 'postgres' ? 'TEXT' : 'VARCHAR(512)';
-  const short = 'VARCHAR(255)';
+  // MySQL is the only dialect that checks the index size when the table is
+  // *created*: InnoDB caps a key at 3072 bytes, and seven columns of
+  // VARCHAR(255)/VARCHAR(512) in utf8mb4 come to ~9196 — so `CREATE TABLE` fails
+  // with ERROR 1071 before a row can be written. Narrowing the columns is the
+  // fix that keeps uniqueness exact: a prefix length would compare only the
+  // first N characters and start rejecting two distinct ids that share them.
+  // SQLite and Postgres have no DDL-time limit, so they keep their wider types.
+  const long =
+    dialect === 'postgres'
+      ? 'TEXT'
+      : dialect === 'mysql'
+        ? 'VARCHAR(191)'
+        : 'VARCHAR(512)';
+  const short = dialect === 'mysql' ? 'VARCHAR(64)' : 'VARCHAR(255)';
   return [
     `  subject_type ${short} NOT NULL`,
     `  subject_id ${long} NOT NULL`,
@@ -97,27 +105,30 @@ function columnDefinitions(dialect: Dialect): string {
  *
  * The unique constraint backs duplicate detection for `insert` mode.
  */
-export function createTupleTableSql(dialect: Dialect): string {
+export function createTupleTableSql(dialect: Dialect, table: string = TABLE): string {
   const unique = KEY_COLUMNS.map((c) => `"${c}"`).join(', ');
+  const indexes = [
+    [`${table}_subject`, 'subject_type, subject_id, relation'],
+    [`${table}_ttu`, 'relation, resource_type, resource_id'],
+    [`${table}_list`, 'resource_type, resource_id'],
+  ];
 
-  const createTable = `CREATE TABLE IF NOT EXISTS ${TABLE} (\n${columnDefinitions(dialect)},\n  CONSTRAINT ${TABLE}_key UNIQUE (${unique})\n)`;
-  const createIndexes = [
-    [TABLE_INDEX, 'subject_type, subject_id, relation'],
-    [TABLE_INDEX_TTU, 'relation, resource_type, resource_id'],
-    [TABLE_INDEX_LIST, 'resource_type, resource_id'],
-  ].map(([name, cols]) => `CREATE INDEX IF NOT EXISTS ${name} ON ${TABLE} (${cols})`);
+  const createTable = `CREATE TABLE IF NOT EXISTS ${table} (\n${columnDefinitions(dialect)},\n  CONSTRAINT ${table}_key UNIQUE (${unique})\n)`;
+  const createIndexes = indexes.map(
+    ([name, cols]) => `CREATE INDEX IF NOT EXISTS ${name} ON ${table} (${cols})`,
+  );
 
   return `${[createTable, ...createIndexes].join(';\n\n')};\n`;
 }
 
-export function dropTupleTableSql(dialect: Dialect): string {
+export function dropTupleTableSql(dialect: Dialect, table: string = TABLE): string {
   if (dialect === 'sqlite') {
-    return `DROP TABLE IF EXISTS ${TABLE};`;
+    return `DROP TABLE IF EXISTS ${table};`;
   }
   return (
-    `DROP TABLE IF EXISTS ${TABLE};\n` +
-    `DROP INDEX IF EXISTS ${TABLE_INDEX};\n` +
-    `DROP INDEX IF EXISTS ${TABLE_INDEX_TTU};\n` +
-    `DROP INDEX IF EXISTS ${TABLE_INDEX_LIST};\n`
+    `DROP TABLE IF EXISTS ${table};\n` +
+    `DROP INDEX IF EXISTS ${table}_subject;\n` +
+    `DROP INDEX IF EXISTS ${table}_ttu;\n` +
+    `DROP INDEX IF EXISTS ${table}_list;\n`
   );
 }

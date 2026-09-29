@@ -1,12 +1,24 @@
 {
   "name": "@tsbouncer/testkit",
-  "version": "1.0.0-dev.0",
+  "version": "1.0.0-preview.1",
   "description": "Conformance suite every TupleStore must pass. There is no CLI; this is the gate.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "engines": {
     "node": ">=20.11"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mahabubone/tsbouncer.git",
+    "directory": "packages/testkit"
+  },
+  "bugs": {
+    "url": "https://github.com/mahabubone/tsbouncer/issues"
+  },
+  "homepage": "https://github.com/mahabubone/tsbouncer/tree/main/packages/testkit#readme",
+  "publishConfig": {
+    "access": "public"
   },
   "exports": {
     ".": {
@@ -28,17 +40,21 @@
     "esm"
   ],
   "scripts": {
+    "prepublishOnly": "pnpm run build",
     "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
-  },
-  "dependencies": {
-    "@tsbouncer/core": "workspace:*"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "pack:check": "publint --strict && attw --pack . --profile esm-only"
   },
   "peerDependencies": {
-    "vitest": ">=3"
+    "tsbouncer": "workspace:*",
+    "vitest": ">=5.0 <6"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "0.18.5",
+    "@vitest/coverage-v8": "5.0.2",
+    "publint": "0.3.24",
     "tsup": "8.5.1",
     "typescript": "5.9.3",
     "vitest": "5.0.2"

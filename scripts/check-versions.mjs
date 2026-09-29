@@ -2,7 +2,7 @@
 /**
  * Every published package is one version, and it is the one in the root.
  *
- * Eight packages drifting to seven versions is how a consumer ends up with two
+ * Five packages drifting to four versions is how a consumer ends up with two
  * copies of the kernel and a type error that reads like a TypeScript bug. There is
  * no release tooling in this repo, so this is the guard: zero dependencies, and it
  * runs in the existing CI job rather than adding one.
@@ -13,7 +13,7 @@ import { join } from 'node:path';
 const root = new URL('..', import.meta.url).pathname;
 const read = (path) => JSON.parse(readFileSync(path, 'utf8'));
 
-/** Walk `packages/`, which is two levels deep: `core` and `stores/<name>`. */
+/** Walk `packages/`, which is two levels deep: `tsbouncer`, `testkit`, and `stores/<name>`. */
 function packageDirs() {
   const dirs = [];
   for (const entry of readdirSync(join(root, 'packages'), { withFileTypes: true })) {

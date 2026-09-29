@@ -2,8 +2,10 @@
 
 Two runnable applications. Both are real programs with assertions: `pnpm examples`
 runs them, CI fails if one breaks, and each has a Vitest suite that asserts the same
-scenario table the tour prints. The documentation site links to these files as the
-source of truth — see the [guides](https://tsbouncer.dev/guides).
+scenario table the tour prints. They are the runnable counterparts of the
+[guides](https://tsbouncer.dev/docs/guides) — same shapes, same lessons — but the
+guides are self-contained tutorials that never point here. Both sides run in CI:
+the examples as suites, the guides through the snippet type-checker.
 
 ```bash
 pnpm examples                                              # run both
@@ -32,7 +34,7 @@ That has already paid for itself. Writing `express-drizzle` found a real bug in
 everything below the second folder, because the walk memoised the edges it had
 already followed on `type:relation`. `check` allowed those documents and
 `listResources` did not list them — the list/check disagreement the query layer is
-supposed to be immune to. It is fixed, with a regression test in `packages/core`.
+supposed to be immune to. It is fixed, with a regression test in the `tsbouncer` package's kernel suite.
 
 ## Two things that surprise people
 

@@ -11,7 +11,7 @@ import {
   type TupleStore,
   ttu,
   wildcard,
-} from '@tsbouncer/core';
+} from 'tsbouncer';
 import { contract } from '../src/index.js';
 import { arrayStore, conditionStrippingStore, overMatchingStore } from './helpers.js';
 

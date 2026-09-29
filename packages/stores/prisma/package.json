@@ -1,12 +1,24 @@
 {
   "name": "@tsbouncer/prisma",
-  "version": "1.0.0-dev.0",
+  "version": "1.0.0-preview.1",
   "description": "TupleStore over an application-owned Prisma client. Requires Prisma 7+.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "engines": {
     "node": ">=20.11"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mahabubone/tsbouncer.git",
+    "directory": "packages/stores/prisma"
+  },
+  "bugs": {
+    "url": "https://github.com/mahabubone/tsbouncer/issues"
+  },
+  "homepage": "https://github.com/mahabubone/tsbouncer/tree/main/packages/stores/prisma#readme",
+  "publishConfig": {
+    "access": "public"
   },
   "exports": {
     ".": {
@@ -28,6 +40,7 @@
     "esm"
   ],
   "scripts": {
+    "prepublishOnly": "pnpm run build",
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "test": "prisma generate --schema prisma/schema.prisma && vitest run",
@@ -35,10 +48,10 @@
     "pack:check": "publint --strict && attw --pack . --profile esm-only"
   },
   "peerDependencies": {
-    "@prisma/client": ">=7"
+    "@prisma/client": ">=7.0 <8"
   },
   "dependencies": {
-    "@tsbouncer/core": "workspace:*"
+    "tsbouncer": "workspace:*"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",

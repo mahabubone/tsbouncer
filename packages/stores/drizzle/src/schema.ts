@@ -33,9 +33,11 @@ export const NULL_ABSENT = '';
  * and the schema must agree on one object, or Drizzle has no column metadata to
  * build SQL from.
  *
- * The column set is byte-for-byte the one `@tsbouncer/kysely` and
- * `@tsbouncer/prisma` expect, so an application can move between adapters
- * without migrating its data. Absent values are `''`, never NULL — see
+ * The column set is the one `@tsbouncer/kysely` and `@tsbouncer/prisma` expect —
+ * same names, same order, same `''`-for-absent rule — so an application can move
+ * between adapters without migrating its data. Only MySQL's declared *widths*
+ * differ, because InnoDB refuses to create the unique index over anything wider
+ * (see `mysqlTsbouncerTuples`). Absent values are `''`, never NULL — see
  * `NULL_ABSENT` in `@tsbouncer/kysely` for why.
  */
 export function sqliteTsbouncerTuples() {
@@ -99,16 +101,24 @@ export function pgTsbouncerTuples() {
 }
 
 export function mysqlTsbouncerTuples() {
+  // MySQL is the only dialect that checks the index size when the table is
+  // *created*: InnoDB caps a key at 3072 bytes, and the seven key columns as
+  // `VARCHAR(255)` / `TEXT` in utf8mb4 come to ~9196 bytes — so `CREATE TABLE`
+  // fails with ERROR 1071 (or 1170 for the `TEXT` columns, which need a prefix
+  // length) before a row can be written. Narrowing the columns is the fix that
+  // keeps uniqueness exact: a prefix length would compare only the first N
+  // characters and start rejecting two distinct ids that happen to share them.
+  // SQLite and Postgres have no DDL-time limit, so they keep their wider types.
   return mysqlTable(
     TABLE,
     {
-      subjectType: myVarchar('subject_type', { length: 255 }).notNull(),
-      subjectId: myText('subject_id').notNull(),
-      subjectRelation: myVarchar('subject_relation', { length: 255 }).notNull(),
-      relation: myVarchar('relation', { length: 255 }).notNull(),
-      resourceType: myVarchar('resource_type', { length: 255 }).notNull(),
-      resourceId: myText('resource_id').notNull(),
-      condition: myVarchar('condition', { length: 255 }).notNull(),
+      subjectType: myVarchar('subject_type', { length: 64 }).notNull(),
+      subjectId: myVarchar('subject_id', { length: 191 }).notNull(),
+      subjectRelation: myVarchar('subject_relation', { length: 64 }).notNull(),
+      relation: myVarchar('relation', { length: 64 }).notNull(),
+      resourceType: myVarchar('resource_type', { length: 64 }).notNull(),
+      resourceId: myVarchar('resource_id', { length: 191 }).notNull(),
+      condition: myVarchar('condition', { length: 64 }).notNull(),
       context: myText('context'),
     },
     (t) => [

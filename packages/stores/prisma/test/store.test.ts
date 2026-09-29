@@ -1,6 +1,6 @@
-import type { Tuple } from '@tsbouncer/core';
+import type { Tuple } from 'tsbouncer';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { KEY_FIELDS, MODEL_DDL, prismaStore } from '../src/index.js';
+import { KEY_FIELDS, MODEL_DDL, prismaStore, rowToTuple } from '../src/index.js';
 import { createDb, ensureTable, type Handle, truncate } from './db.js';
 
 const T = (subject: string, relation: string, resource: string): Tuple => ({
@@ -120,9 +120,10 @@ describe('schema constants', () => {
 });
 
 describe('model naming', () => {
-  it('reports a clear error when the model name is wrong', async () => {
-    const s = prismaStore(handle.prisma, { model: 'NoSuchModel' });
-    await expect(s.read()).rejects.toThrow();
+  it('reports a clear error when the model name is wrong', () => {
+    expect(() => prismaStore(handle.prisma, { model: 'NoSuchModel' })).toThrow(
+      /has no model "NoSuchModel"/,
+    );
   });
 });
 
@@ -145,5 +146,111 @@ describe('replace is atomic', () => {
     expect(
       (await s.read({ resource: 'document:1' })).items.map((t) => t.subject),
     ).toEqual(['user:carol']);
+  });
+});
+
+describe('a write spanning several batches', () => {
+  it('names the one-param-set rule when a re-binding collides', async () => {
+    const s = store();
+    const base = {
+      ...T('user:alice', 'viewer', 'document:1'),
+      condition: 'inRegion',
+    };
+    await s.write({ tuples: [{ ...base, context: { region: 'eu' } }] });
+    await expect(
+      s.write({ tuples: [{ ...base, context: { region: 'us' } }] }),
+    ).rejects.toThrow(/one param-set/);
+  });
+
+  it('commits none of its batches when one fails', async () => {
+    const s = prismaStore(handle.prisma, { batchSize: 1 });
+    await s.write({ tuples: [T('user:alice', 'viewer', 'document:1')] });
+
+    await expect(
+      s.write({
+        tuples: [
+          T('user:d1', 'viewer', 'document:1'),
+          T('user:d2', 'viewer', 'document:1'),
+          T('user:alice', 'viewer', 'document:1'),
+        ],
+      }),
+    ).rejects.toThrow(/unique/);
+
+    expect((await s.read()).items.map((t) => t.subject).sort()).toEqual(['user:alice']);
+  });
+
+  it('commits no upsert when a later row fails', async () => {
+    const s = prismaStore(handle.prisma, { batchSize: 1 });
+    const bad = prismaStore(handle.prisma, {
+      uniqueKeyName: 'not_a_real_unique_input',
+    });
+    await expect(
+      bad.write({
+        tuples: [
+          T('user:x', 'viewer', 'document:1'),
+          T('user:y', 'viewer', 'document:1'),
+        ],
+        mode: 'upsert',
+      }),
+    ).rejects.toThrow();
+    expect((await s.read()).items).toHaveLength(0);
+  });
+});
+
+describe('limits that cannot be honoured', () => {
+  it('returns an empty page rather than an arbitrary slice', async () => {
+    const s = store();
+    await s.write({
+      tuples: [
+        T('user:a', 'viewer', 'document:1'),
+        T('user:b', 'viewer', 'document:1'),
+        T('user:c', 'viewer', 'document:1'),
+      ],
+    });
+
+    expect((await s.read({ limit: 0 })).items).toHaveLength(0);
+    expect((await s.read({ limit: -1 })).items).toHaveLength(0);
+  });
+});
+
+describe('failure messages', () => {
+  it('does not blame a constraint for an unrelated failure', async () => {
+    const s = prismaStore(handle.prisma, { uniqueKeyName: 'not_a_real_unique_input' });
+    await expect(
+      s.write({ tuples: [T('user:a', 'viewer', 'document:1')], mode: 'upsert' }),
+    ).rejects.toThrow(/upsert failed/);
+  });
+
+  it('wraps a driver error from read in a StoreError', async () => {
+    const s = store();
+    await handle.prisma.$executeRawUnsafe('DROP TABLE "TsbouncerTuple"');
+
+    await expect(s.read()).rejects.toThrow(/read failed/);
+  });
+});
+
+// The table contract stores `''` for an absent optional column, and only the
+// contract's own DDL guarantees it. Against a schema that allowed NULL the row
+// would decode as `user:alice#null` — a reference no subject filter matches and
+// no delete-by-subject reaches, so the row would be permanent and invisible.
+describe('row decoding', () => {
+  it('reads a NULL optional column as absent rather than as a relation name', () => {
+    const fields = {
+      subjectType: 'user',
+      subjectId: 'alice',
+      subjectRelation: null as unknown as string,
+      relation: 'viewer',
+      resourceType: 'document',
+      resourceId: '1',
+      condition: null as unknown as string,
+      context: null,
+    };
+    expect(rowToTuple(fields as never)).toEqual({
+      subject: 'user:alice',
+      relation: 'viewer',
+      resource: 'document:1',
+      condition: undefined,
+      context: undefined,
+    });
   });
 });

@@ -1,10 +1,11 @@
-import type { Tuple } from '@tsbouncer/core';
+import type { Tuple } from 'tsbouncer';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   createTupleTableSql,
   dropTupleTableSql,
   isDialect,
   kyselyStore,
+  rowToTuple,
 } from '../src/index.js';
 import { createDb, type Handle, recreateTable } from './db.js';
 
@@ -243,10 +244,38 @@ describe('schema', () => {
     }
   });
 
-  it('uses TEXT for postgres and VARCHAR elsewhere', () => {
+  it('uses TEXT for postgres and MySQL-safe widths for MySQL', () => {
     expect(createTupleTableSql('postgres')).toContain('subject_id TEXT');
     expect(createTupleTableSql('sqlite')).toContain('subject_id VARCHAR(512)');
-    expect(createTupleTableSql('mysql')).toContain('subject_id VARCHAR(512)');
+    // See `columnDefinitions`: InnoDB refuses to create the unique index over
+    // anything wider, so a MySQL install must get the narrow widths.
+    expect(createTupleTableSql('mysql')).toContain('subject_id VARCHAR(191)');
+    expect(createTupleTableSql('mysql')).toContain('subject_type VARCHAR(64)');
+  });
+
+  it('keeps the MySQL unique index inside InnoDB key limit', () => {
+    const sql = createTupleTableSql('mysql');
+    const keyColumns = [
+      'subject_type',
+      'subject_id',
+      'subject_relation',
+      'relation',
+      'resource_type',
+      'resource_id',
+      'condition',
+    ];
+
+    const bytes = keyColumns.reduce((sum, column) => {
+      const match = sql.match(new RegExp(`^\\s+${column} (\\w+)(?:\\((\\d+)\\))?`, 'm'));
+      if (match === null) throw new Error(`no column definition for ${column}`);
+      if (match[1] !== 'VARCHAR' || match[2] === undefined) {
+        throw new Error(`${column} is not a bounded varchar; a MySQL key needs one`);
+      }
+      return sum + Number(match[2]);
+    }, 0);
+
+    // utf8mb4, the default and the worst case, is four bytes per character.
+    expect(bytes * 4).toBeLessThanOrEqual(3072);
   });
 
   it('generates a drop statement for every dialect', () => {
@@ -267,5 +296,140 @@ describe('schema', () => {
     await s.write({ tuples: [T('user:alice', 'viewer', 'document:1')] });
     recreateTable(handle);
     expect((await s.read()).items).toHaveLength(0);
+  });
+});
+
+describe('a write spanning several batches', () => {
+  it('commits none of its batches when one fails', async () => {
+    const s = kyselyStore(handle.db, { batchSize: 1 });
+    await s.write({ tuples: [T('user:alice', 'viewer', 'document:1')] });
+
+    await expect(
+      s.write({
+        tuples: [
+          T('user:d1', 'viewer', 'document:1'),
+          T('user:d2', 'viewer', 'document:1'),
+          T('user:alice', 'viewer', 'document:1'),
+        ],
+      }),
+    ).rejects.toThrow(/unique/);
+
+    expect((await s.read()).items.map((t) => t.subject).sort()).toEqual(['user:alice']);
+  });
+});
+
+describe('failure messages', () => {
+  it('names a unique constraint only when there was one', async () => {
+    const s = store();
+    await s.write({ tuples: [T('user:alice', 'viewer', 'document:1')] });
+
+    await expect(
+      s.write({ tuples: [T('user:alice', 'viewer', 'document:1')] }),
+    ).rejects.toThrow(/unique constraint/);
+  });
+
+  it('names the one-param-set rule when a re-binding collides', async () => {
+    const s = store();
+    const base = {
+      ...T('user:alice', 'viewer', 'document:1'),
+      condition: 'inRegion',
+    };
+    await s.write({ tuples: [{ ...base, context: { region: 'eu' } }] });
+    await expect(
+      s.write({ tuples: [{ ...base, context: { region: 'us' } }] }),
+    ).rejects.toThrow(/one param-set/);
+  });
+
+  it('does not blame a constraint for an unrelated failure', async () => {
+    const s = kyselyStore(handle.db, { table: 'no_such_table' });
+
+    await expect(
+      s.write({ tuples: [T('user:alice', 'viewer', 'document:1')] }),
+    ).rejects.toThrow(/write failed/);
+    await expect(
+      s.write({ tuples: [T('user:alice', 'viewer', 'document:1')], mode: 'upsert' }),
+    ).rejects.toThrow(/upsert failed/);
+  });
+});
+
+describe('writing through a caller-owned transaction', () => {
+  it('accepts an upsert without trying to open a nested transaction', async () => {
+    const s = store();
+    await handle.db.transaction().execute(async (trx) => {
+      const scoped = kyselyStore(trx);
+      await scoped.write({
+        tuples: [{ ...T('user:a', 'viewer', 'document:1'), condition: 'inRegion' }],
+        mode: 'upsert',
+      });
+      await scoped.write({
+        tuples: [{ ...T('user:a', 'viewer', 'document:1'), condition: 'inRegion' }],
+        mode: 'upsert',
+      });
+      expect((await scoped.read()).items).toHaveLength(1);
+    });
+    expect((await s.read()).items).toHaveLength(1);
+  });
+
+  it('accepts a multi-batch write', async () => {
+    const s = store();
+    await handle.db.transaction().execute(async (trx) => {
+      const scoped = kyselyStore(trx, { batchSize: 1 });
+      await scoped.write({
+        tuples: [
+          T('user:a', 'viewer', 'document:1'),
+          T('user:b', 'viewer', 'document:1'),
+          T('user:c', 'viewer', 'document:1'),
+        ],
+      });
+      expect((await scoped.read()).items).toHaveLength(3);
+    });
+    expect((await s.read()).items).toHaveLength(3);
+  });
+});
+
+describe('DDL for a custom table name', () => {
+  it('creates and drops the table it was asked for', () => {
+    const created = createTupleTableSql('postgres', 'my_tuples');
+    expect(created).toContain('CREATE TABLE IF NOT EXISTS my_tuples');
+    expect(created).toContain('CREATE INDEX IF NOT EXISTS my_tuples_subject');
+    expect(created).not.toContain('tsbouncer_tuples');
+
+    const dropped = dropTupleTableSql('postgres', 'my_tuples');
+    expect(dropped).toContain('DROP TABLE IF EXISTS my_tuples');
+    expect(dropped).not.toContain('tsbouncer_tuples');
+  });
+
+  it('creates a store that can actually use it', async () => {
+    handle.raw.exec(createTupleTableSql('sqlite', 'my_tuples'));
+    const s = kyselyStore(handle.db, { table: 'my_tuples' });
+    await s.write({ tuples: [T('user:alice', 'viewer', 'document:1')] });
+    expect((await s.read()).items).toHaveLength(1);
+    handle.raw.exec(dropTupleTableSql('sqlite', 'my_tuples'));
+  });
+});
+
+// The table contract stores `''` for an absent optional column, and only the
+// contract's own DDL guarantees it. Against a schema that allowed NULL the row
+// would decode as `user:alice#null` — a reference no subject filter matches and
+// no delete-by-subject reaches, so the row would be permanent and invisible.
+describe('row decoding', () => {
+  it('reads a NULL optional column as absent rather than as a relation name', () => {
+    const fields = {
+      subject_type: 'user',
+      subject_id: 'alice',
+      subject_relation: null as unknown as string,
+      relation: 'viewer',
+      resource_type: 'document',
+      resource_id: '1',
+      condition: null as unknown as string,
+      context: null,
+    };
+    expect(rowToTuple(fields as never)).toEqual({
+      subject: 'user:alice',
+      relation: 'viewer',
+      resource: 'document:1',
+      condition: undefined,
+      context: undefined,
+    });
   });
 });
