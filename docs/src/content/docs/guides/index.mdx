@@ -1,0 +1,84 @@
+---
+title: Guides
+description: Two runnable applications, and the files they are built from.
+section: Guides
+order: 20
+kind: guide
+---
+
+import Callout from '~/components/Callout.astro';
+
+## Two applications, not two snippets
+
+Everything else in these docs is a fragment sized to make a point. The two
+applications are not: each one is a real program with a real HTTP server, a real
+database or file, and a scenario table that is both printed as a tour and asserted in
+CI.
+
+They exist because the interesting parts of authorization are not the model. They are
+the order of the checks in a route, where the request context comes from, what happens
+to a transaction when a document moves, and whether the list endpoint and the detail
+endpoint agree. A fragment cannot show any of that, and getting it subtly wrong in a
+fragment is how a library ends up with a correct engine and an unusable story.
+
+<Callout type="note" title="Why the guides point at files rather than pasting them">
+  Every page here links to the exact file a claim comes from, and a test in this site
+  fails if one of those links stops pointing at a file that exists. A guide that
+  quotes code which has since been rewritten is worse than a guide that links out —
+  and drift here is invisible to every other check, because a snippet that no longer
+  matches its application still compiles perfectly well on its own.
+</Callout>
+
+## The catalog
+
+| guide | stack | the situation | what it is for |
+| --- | --- | --- | --- |
+| [A simple RBAC API](/guides/hono-rbac) | Hono, `@tsbouncer/json` | you are wiring this into a new service and want the smallest thing that works | the shape to internalise first: one idea, three types, and the whole access graph in a file you can read |
+| [A real-world documents API](/guides/express-drizzle) | Express, Drizzle ORM, SQLite | a product that outgrew `owner_id` | where the failures are: inheritance, exclusions, three conditions, a transactional move, and a list that agrees with a check |
+
+Read them in that order. The first is deliberately plain; the second is deliberately
+accumulated, the way real access rules are.
+
+## Source of truth
+
+| example | files |
+| --- | --- |
+| [`hono-rbac`](https://github.com/tsbouncer/tsbouncer/tree/main/examples/hono-rbac) | [model](https://github.com/tsbouncer/tsbouncer/blob/main/examples/hono-rbac/src/model.ts) · [seed](https://github.com/tsbouncer/tsbouncer/blob/main/examples/hono-rbac/src/data.ts) · [auth](https://github.com/tsbouncer/tsbouncer/blob/main/examples/hono-rbac/src/auth.ts) · [routes](https://github.com/tsbouncer/tsbouncer/blob/main/examples/hono-rbac/src/app.ts) · [boot](https://github.com/tsbouncer/tsbouncer/blob/main/examples/hono-rbac/src/server.ts) · [scenarios](https://github.com/tsbouncer/tsbouncer/blob/main/examples/hono-rbac/src/scenarios.ts) · [tests](https://github.com/tsbouncer/tsbouncer/blob/main/examples/hono-rbac/test/api.test.ts) |
+| [`express-drizzle`](https://github.com/tsbouncer/tsbouncer/tree/main/examples/express-drizzle) | [model](https://github.com/tsbouncer/tsbouncer/blob/main/examples/express-drizzle/src/model.ts) · [seed](https://github.com/tsbouncer/tsbouncer/blob/main/examples/express-drizzle/src/seed.ts) · [schema](https://github.com/tsbouncer/tsbouncer/blob/main/examples/express-drizzle/src/db/schema.ts) · [caller](https://github.com/tsbouncer/tsbouncer/blob/main/examples/express-drizzle/src/http.ts) · [routes](https://github.com/tsbouncer/tsbouncer/blob/main/examples/express-drizzle/src/app.ts) · [migration](https://github.com/tsbouncer/tsbouncer/blob/main/examples/express-drizzle/drizzle/0000_init.sql) · [scenarios](https://github.com/tsbouncer/tsbouncer/blob/main/examples/express-drizzle/src/scenarios.ts) · [tests](https://github.com/tsbouncer/tsbouncer/blob/main/examples/express-drizzle/test/api.test.ts) · [schema tests](https://github.com/tsbouncer/tsbouncer/blob/main/examples/express-drizzle/test/schema.test.ts) |
+
+## Running them
+
+```bash
+pnpm examples                                              # both
+pnpm --filter @tsbouncer-examples/hono-rbac start          # 19 requests
+pnpm --filter @tsbouncer-examples/express-drizzle start    # 50 requests
+```
+
+Both print a status line per scenario and exit non-zero if any fails, so a tour is a
+test with output. `pnpm examples` runs them in CI, which is the point: a model that no
+longer builds fails in the pipeline rather than in a reader's terminal.
+
+## What writing them found
+
+The second example exists partly because the first one was not enough, and building it
+turned up a real bug rather than a real bug report.
+
+`listResources` walks the `through` edges to find resources whose access is inherited,
+and it used to memoise the edges it had already followed on `type:relation`. Two
+folders of the same type share that token, so the second folder was never walked and
+every document below it was never a candidate. `check` allowed them; `listResources`
+did not list them. A self-referential folder tree — the ordinary shape of any file
+manager — hit it on the first try.
+
+It is fixed, with a regression test that walks `folder → folder → folder` and asserts
+each document against `can` rather than against a literal list. The lesson generalises
+past this library: a list endpoint and a detail endpoint are two implementations of one
+question, and the only thing that keeps them honest is a test that holds them to each
+other.
+
+## Related
+
+- [Wiring it into HTTP](/recipes/http) — the framework-agnostic shape these two follow
+- [ReBAC](/recipes/rebac) — the graph, in isolation
+- [Conditions](/concepts/conditions) — attribute-gated access, in isolation
+- [Stores](/concepts/stores) — what the store actually has to do

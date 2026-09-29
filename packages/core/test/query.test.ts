@@ -238,6 +238,65 @@ describe('listResources', () => {
     expect(result.resources).toEqual(['document:5']);
   });
 
+  it('walks a chain that repeats a type, which is the same-type case', async () => {
+    /*
+     * The test above walks document → folder → archive, so each hop has its own
+     * type. A real folder tree is self-referential: folder → folder → folder, with
+     * the leaves hanging off the bottom. That is the case the walk used to get
+     * wrong.
+     *
+     * It memoised the edges it had already followed on `type:relation`, so two
+     * folders of the same type shared one token: the first folder's `parent` edges
+     * were walked and the second folder's never were. Everything below the second
+     * folder was therefore never a candidate, and `can` allowed documents that
+     * `listResources` did not list — the exact list/check disagreement this file is
+     * about, arrived at from the query layer rather than the evaluator.
+     */
+    const selfModel = defineModel({
+      types: {
+        user: defineType({}),
+        team: defineType({ relations: { member: relation('user') } }),
+        folder: defineType({
+          relations: {
+            viewer: relation('user').or(relation('team', { through: 'member' })),
+            // Self-referential, which is the whole point: `folder` -> `folder`.
+            parent: relation('folder'),
+          },
+          permissions: { read: permission.or('viewer', ttu('parent', 'read')) },
+        }),
+        document: defineType({
+          relations: { parent: relation('folder') },
+          permissions: { read: permission.or(ttu('parent', 'read')) },
+        }),
+      },
+    });
+
+    // `alice` is a viewer of folder:eng only. document:1 sits directly in it;
+    // document:2 and document:3 sit one folder further down, and are reachable
+    // only if the walk keeps going after it has already followed `folder:parent`.
+    const deep = [
+      T('user:alice', 'viewer', 'folder:eng'),
+      T('folder:root', 'parent', 'folder:eng'),
+      T('folder:eng', 'parent', 'folder:infra'),
+      T('folder:eng', 'parent', 'document:1'),
+      T('folder:infra', 'parent', 'document:2'),
+      T('folder:infra', 'parent', 'document:3'),
+    ];
+    const authz = createAuthz({ model: selfModel, store: testStore(deep) });
+
+    const { resources } = await authz.listResources({
+      subject: 'user:alice',
+      permission: 'document.read',
+    });
+
+    // Asserted against `can` rather than against a literal, so the two paths are
+    // held to each other instead of to this list.
+    for (const resource of ['document:1', 'document:2', 'document:3']) {
+      expect(await authz.can('user:alice', 'document.read', resource)).toBe(true);
+      expect(resources, `${resource} is readable but was not listed`).toContain(resource);
+    }
+  });
+
   it('respects a condition', async () => {
     const conditioned = [
       { ...T('user:alice', 'owner', 'document:1'), condition: 'always' },

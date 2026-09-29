@@ -1,42 +1,47 @@
 # Examples
 
-Every example is a real, runnable program with assertions — not a snippet. If one
-of these breaks, CI fails, so they cannot rot into fiction. They are also typechecked,
-which is how the conditions example was caught reading `unknown` where it declared a
-`number`.
-
-Each example has its own README explaining what it shows, what output to expect, and
-the one thing about it worth reading twice.
+Two runnable applications. Both are real programs with assertions: `pnpm examples`
+runs them, CI fails if one breaks, and each has a Vitest suite that asserts the same
+scenario table the tour prints. The documentation site links to these files as the
+source of truth — see the [guides](https://tsbouncer.dev/guides).
 
 ```bash
-pnpm examples          # run them all
-pnpm --filter @tsbouncer-examples/vanilla start
+pnpm examples                                              # run both
+pnpm --filter @tsbouncer-examples/hono-rbac start          # the simple one
+pnpm --filter @tsbouncer-examples/express-drizzle start    # the real-world one
 ```
 
 | example | the situation | what it shows |
 | --- | --- | --- |
-| [`hand-rolled`](./hand-rolled) | you already have a `canRefund()` and it is quietly wrong | replacing it: a cross-tenant leak and a ban bypass, both fixed |
-| [`express-app`](./express-app) | you have an Express app and a product that outgrew `owner_id` | a real documents API over real HTTP — RBAC, ReBAC and ABAC together, on three stores |
-| [`vanilla`](./vanilla) | a small document tool with teams, folders, and public docs | the smallest useful model: ownership, usersets, wildcards, exclusion, inheritance |
-| [`multi-tenant`](./multi-tenant) | you just onboarded customer forty | per-tenant ids, with no tenancy anywhere in the engine |
-| [`tuple-to-userset`](./tuple-to-userset) | support asks why a folder grant stopped working | access inheriting down a tree, and the direction of a `parent` tuple |
-| [`conditions`](./conditions) | you sell per-seat access | attribute-gated access, and why the tuple's bound parameters are authoritative |
-| [`json-store`](./json-store) | a fixture, a seed script, and a demo env | authorization state as a human-readable, git-friendly file |
+| [`hono-rbac`](./hono-rbac) | you are wiring this into a new service and want the smallest thing that works | [Hono](https://hono.dev) routes, RBAC, and the whole access graph in a JSON file you can read and commit |
+| [`express-drizzle`](./express-drizzle) | you have a product that outgrew `owner_id` | Express, Drizzle ORM and SQLite, with ReBAC, RBAC and three ABAC conditions on one model |
 
-If you read one, read [`hand-rolled`](./hand-rolled) — it is the case for the
-library. If you are wiring this into something you already have, read
-[`express-app`](./express-app). [`vanilla`](./vanilla) is the shortest useful
-program and the one to start from once you believe the case.
+Read them in that order. The first is the shape to internalise; the second is where
+the interesting failures are.
+
+## How they are verified
+
+Each example has a `src/scenarios.ts` listing live HTTP requests — a method, a path,
+headers, and the status and body assertions that must hold. `src/main.ts` prints that
+table as a tour and exits non-zero if a line fails; `test/api.test.ts` asserts the
+same table. A demo and a gate reading one list cannot drift apart, which is the only
+reason either of them is worth trusting.
+
+That has already paid for itself. Writing `express-drizzle` found a real bug in
+`listResources`: a self-referential folder chain (`folder → folder → folder`) lost
+everything below the second folder, because the walk memoised the edges it had
+already followed on `type:relation`. `check` allowed those documents and
+`listResources` did not list them — the list/check disagreement the query layer is
+supposed to be immune to. It is fixed, with a regression test in `packages/core`.
 
 ## Two things that surprise people
 
-**A relation is a property of its resource, so the parent is the subject.**
-`{ subject: 'folder:backend', relation: 'parent', resource: 'document:api' }`
-reads "document:api's parent is folder:backend". Write-time validation rejects the
-reverse, but it is still the single most common mistake with this model — the
-`tuple-to-userset` example says so out loud.
+**A userset edge needs a userset subject.** An RBAC grant is
+`role:acme:editor#holder`, not `role:acme:editor` — the `#holder` is the relation
+the model's edge walks. Write the bare role and validation rejects it with a message
+that says exactly this, which is the good kind of mistake to make.
 
-**A direct team subject is not its members.** `team:eng` written directly grants
-the team *object*; `team:eng#member` grants everyone who is a member. They are
-different grants with the same relation name, which is why the `vanilla` example
-carries an assertion for each.
+**The parent is the subject.** `{ subject: 'folder:root', relation: 'parent',
+resource: 'folder:eng' }` reads "folder:eng's parent is folder:root". A relation is
+a property of the thing it is read from. The other way round validates cleanly and
+then every inheritance rule in the system resolves to nothing, with no error anywhere.

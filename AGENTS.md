@@ -41,7 +41,7 @@ packages/stores/drizzle  @tsbouncer/drizzle
 packages/stores/prisma   @tsbouncer/prisma
 packages/testkit         @tsbouncer/testkit   conformance + golden suites
 packages/tsbouncer       tsbouncer            batteries-included re-export
-examples/                runnable, verified in CI (`pnpm examples`)
+examples/                two runnable apps, verified in CI (`pnpm examples`)
 docs/                    Astro 7 docs site; every snippet is type-checked
 ```
 
@@ -89,7 +89,7 @@ pnpm build          # tsup, ESM only
 pnpm typecheck
 pnpm test           # vitest, includes testkit against every store
 pnpm test:coverage  # vitest + v8, 90% gate, fails below threshold
-pnpm examples       # runs every example; CI fails if one breaks
+pnpm examples       # runs both example apps; CI fails if one breaks
 pnpm pack:check     # publint --strict + attw --profile esm-only
 pnpm lint
 pnpm check          # all of the above, in order
@@ -174,6 +174,20 @@ the evaluator.
 - **A condition gates every edge kind.** `direct`, `userset`, and tuple-to-userset all
   route through one `splitByCondition` partition. They used to be three ad-hoc filters,
   and `userset` was briefly fail-open because only two of them checked.
+- **A walk dedupes on the object, never on the edge it is following.**
+  `candidateResources` memoised the `through` relations it had followed on
+  `type:relation`, so two objects of the same type shared one token and the second
+  was never walked. Everything below it in a self-referential
+  `folder → folder → folder` chain was then invisible to `listResources` while
+  `check` allowed it. The queue already visits each object once; memoising the
+  *model read* per type is safe, memoising the *walk* per edge is not. The
+  regression test in `test/query.test.ts` asserts each resource against `can`
+  rather than against a literal list, which is the only shape that catches it.
+- **A list endpoint and a detail endpoint are two implementations of one
+  question.** Any change to the query layer needs a test that holds the two
+  against each other. The bug above, and the earlier one where `listResources`
+  dropped the `context` it promised to forward, are both list/check disagreement,
+  and neither is caught by a test that asserts either side alone.
 
 ## Working agreement
 

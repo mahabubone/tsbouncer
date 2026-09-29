@@ -53,9 +53,10 @@ jobs:
         run: pnpm test:coverage
 
       - name: Run examples
-        # The examples are the documentation, so they are executable and they are
-        # part of the gate: a model that no longer builds fails here, not in a
-        # reader's terminal.
+        # The examples are the documentation the guides link to, so they are
+        # executable and they are part of the gate: a model that no longer builds
+        # fails here, not in a reader's terminal. Their `test` scripts are picked up
+        # by the step above, so a broken scenario fails before the tour even runs.
         run: pnpm examples
 
       - name: Build

@@ -1,0 +1,23 @@
+{
+  "name": "@tsbouncer-examples/hono-rbac",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "The smallest useful RBAC API: Hono, a JSON file, and roles you can read.",
+  "scripts": {
+    "start": "tsx src/main.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "2.1.3",
+    "hono": "4.13.11",
+    "tsbouncer": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.3",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vitest": "5.0.2"
+  }
+}

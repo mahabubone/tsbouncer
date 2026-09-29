@@ -1,0 +1,178 @@
+---
+title: A simple RBAC API
+description: Hono, a JSON file, and one idea — a document never names a person.
+section: Guides
+order: 21
+kind: guide
+---
+
+import Callout from '~/components/Callout.astro';
+
+The smallest application that is genuinely useful: [Hono](https://hono.dev) routes,
+role-based access control, and the entire access graph in a file you can read, diff
+and commit.
+
+```bash
+pnpm --filter @tsbouncer-examples/hono-rbac start
+pnpm --filter @tsbouncer-examples/hono-rbac test
+```
+
+Source: [`examples/hono-rbac`](https://github.com/tsbouncer/tsbouncer/tree/main/examples/hono-rbac) ·
+[model](https://github.com/tsbouncer/tsbouncer/blob/main/examples/hono-rbac/src/model.ts) ·
+[routes](https://github.com/tsbouncer/tsbouncer/blob/main/examples/hono-rbac/src/app.ts) ·
+[scenarios](https://github.com/tsbouncer/tsbouncer/blob/main/examples/hono-rbac/src/scenarios.ts)
+
+## One idea
+
+**A document never names a person.** It names a *role*, and the role names its
+holders, so onboarding someone is one write rather than one per document.
+
+```ts setup
+import { createAuthz, defineModel, defineType, jsonStore, permission, relation } from 'tsbouncer';
+```
+
+```ts
+export const model = defineModel({
+  types: {
+    user: defineType({}),
+
+    role: defineType({
+      relations: { holder: relation('user') },
+      permissions: { use: permission.or('holder') },
+    }),
+
+    document: defineType({
+      relations: {
+        owner: relation('user'),
+        editor: relation('user').or(relation('role', { through: 'holder' })),
+        viewer: relation('user').or(relation('role', { through: 'holder' })),
+      },
+      permissions: {
+        read: permission.or('owner', 'editor', 'viewer'),
+        write: permission.or('owner', 'editor'),
+        manage: permission.or('owner'),
+      },
+    }),
+  },
+});
+```
+
+`relation('role', { through: 'holder' })` is what turns a role into "everyone who
+holds it". A userset edge must name a **relation**, never a permission — `holder` is
+one, which is why this works.
+
+## The one thing to read twice
+
+An RBAC grant's subject is a userset, not the role:
+
+```jsonc
+{ "subject": "role:acme:editor#holder", "relation": "editor", "resource": "document:1" }
+```
+
+The `#holder` is the relation the model's edge walks, so the tuple reads "the holders
+of `acme:editor` are editors of this document", and a separate block of tuples says
+who that is. Write the bare role instead and validation rejects it:
+
+```
+relation "editor" on "document" does not accept a "role" subject
+```
+
+It is the most common first mistake with the model, and it is caught at write time
+rather than becoming a 403 nobody can explain.
+
+## Identity, and the 401/403 split
+
+```ts ts-skip
+export function identify(authz: Authz): MiddlewareHandler<Env> {
+  return async (c, next) => {
+    c.set('authz', authz);
+    const id = c.req.header('x-user-id');
+    c.set('subject', id === undefined || id === '' ? undefined : `user:${id}`);
+    await next();
+  };
+}
+```
+
+A real app reads a session or a verified token; either way it ends the same way — one
+string in a context variable. Authorization starts from that string and nothing else.
+The library has no opinion about how you authenticated, and deliberately no way to be
+told.
+
+`src/auth.ts` keeps the distinction that matters: anonymous is **401**, authenticated
+but refused is **403**. Conflating them tells a user to log in when logging in will not
+help.
+
+## The ordering rule
+
+Every route in `src/app.ts` does the same three things in the same order:
+
+```ts ts-skip
+app.get('/api/documents/:id', async (c) => {
+  const id = c.req.param('id');
+  await requirePermission(c, 'document.read', `document:${id}`);
+  const document = documents.find(id);
+  if (document === undefined) throw new HttpError(404, 'not_found', `no document ${id}`);
+  return c.json(document);
+});
+```
+
+**Authorize before the row lookup.** A caller who may not read a document gets 403
+whether or not it exists, so the API cannot be used to probe for other people's ids.
+Inverting those two lines is a free existence oracle, and it is the most common way a
+hand-written check leaks.
+
+The price is that a 404 only happens for someone who was allowed to ask — which in
+practice means "the grant outlived the row". The fixture has one of those on purpose
+(`document:9` has an owner grant and no row), and two scenarios assert the pair.
+
+## Two permissions, not one
+
+`document.write` is open to editors. `document.manage` is not — it is the owner alone,
+and it is what changes *who has access*. A system where an editor can edit the access
+list is a system where a compromised editor account exfiltrates the document.
+
+## The list endpoint
+
+```ts ts-skip
+// src/app.ts — a reverse walk of the graph rather than a WHERE clause over rows.
+app.get('/api/documents', async (c) => {
+  const subject = caller(c);
+  const { resources, truncated } = await authz.listResources({
+    subject,
+    permission: 'document.read',
+  });
+  const ids = resources.map((reference) => reference.slice('document:'.length));
+  return c.json({ documents: documents.findMany(ids), truncated });
+});
+```
+
+A reverse walk of the graph rather than a `WHERE` clause over the rows, so the answer
+is correct for every rule the model declares — including one added next week that
+nobody remembers to write a query for.
+
+`truncated` is part of the contract, not a footnote. The walk is budgeted, a budget
+that runs out mid-enumeration produces a partial list, and a bare array could not tell
+you that. The route returns the flag even when it is `false`.
+
+## Storage, in one line
+
+```ts
+const authz = createAuthz({ model, store: jsonStore({ file: 'authz.json' }) });
+```
+
+Reads happen while the store is constructed; writes are on disk by the time the
+promise resolves, written to a temp file and renamed into place, so a crash cannot
+leave a half-written access list. A missing file is an empty store, which is what
+makes a checked-in fixture work — the *directory* has to exist, because this store
+creates a file, not a tree.
+
+The tour prints the file at the end, because for this example the storage format is
+half the point.
+
+## When to stop reading
+
+There is no folder tree, no teams, no inheritance, no attributes and no conditions
+here. That is deliberate — it is the shape to internalise first. When the
+requirements outgrow it, the
+[real-world API](/guides/express-drizzle) is the same library over a real database with
+ReBAC and ABAC on one model.

@@ -253,9 +253,21 @@ async function candidateResources(
   // hide things the user can open.
   await collectSetGrants(ctx, subject, consider);
 
-  // Walk the `through` edges in both directions across every type touched, so a
+  // Walk the `through` edges in both directions across every object touched, so a
   // document four edges below an ancestor is still found.
-  const seenThroughs = new Set<string>();
+  //
+  // The queue already guarantees each object is visited once, and that is the only
+  // dedup this needs. Memoising on `type:relation` instead looked like a cheaper
+  // way to bound the work and was quietly wrong: two folders of the same type share
+  // the token `folder:parent`, so the second folder was never walked, and any
+  // document *below* it was never a candidate. `check` allowed those documents
+  // while `listResources` omitted them, which is the list/check disagreement this
+  // function exists to avoid — inherited access that is invisible to the walk is
+  // invisible to any UI built on it.
+  //
+  // `inheritedInto` is a pure read of the model, so *that* is what is safe to
+  // memoise, per type rather than per type-and-relation.
+  const throughsByType = new Map<string, [string, string[]][]>();
   while (queue.length > 0) {
     if (!charge(ctx, 0)) break;
     const known = queue.shift();
@@ -263,11 +275,13 @@ async function candidateResources(
     const ref = tryRef(known, 'object');
     if (ref === undefined) continue;
 
-    for (const [relation, accepted] of inheritedInto(ctx.model, ref.type)) {
-      const token = `${ref.type}:${relation}`;
-      if (seenThroughs.has(token)) continue;
-      seenThroughs.add(token);
+    let throughs = throughsByType.get(ref.type);
+    if (throughs === undefined) {
+      throughs = inheritedInto(ctx.model, ref.type);
+      throughsByType.set(ref.type, throughs);
+    }
 
+    for (const [relation, accepted] of throughs) {
       // Objects that inherit *from* this one.
       for (const tuple of await read(ctx, { subject: known, relation })) {
         const child = tryRef(tuple.resource, 'object');

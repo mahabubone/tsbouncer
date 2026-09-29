@@ -66,8 +66,7 @@ tsbouncer/
 │  ├─ stores/prisma/   @tsbouncer/prisma
 │  ├─ testkit/         @tsbouncer/testkit   conformance + golden suites
 │  └─ tsbouncer/       tsbouncer            batteries-included re-export
-├─ examples/           hand-rolled · express-app · vanilla · multi-tenant
-│                      tuple-to-userset · conditions · json-store
+├─ examples/           hono-rbac · express-drizzle
 └─ pnpm-workspace.yaml
 ```
 
@@ -127,7 +126,7 @@ interface TupleStore {
 | M3 | TTU traversal (lands the `ttu` node) | **high** |
 | M4 | conditions / ABAC, fail-closed | med |
 | M5 | `jsonStore` (atomic temp+rename) | med |
-| M6 | root `tsbouncer` pkg · examples | low |
+| M6 | root `tsbouncer` pkg | low |
 | S1 | `@tsbouncer/kysely` — filtered reads over the app's existing Kysely instance | med |
 | S2 | `@tsbouncer/drizzle` — same, over the app's existing Drizzle instance | med |
 | S3 | `@tsbouncer/prisma` — same, over the app's existing `PrismaClient` | med |
@@ -258,9 +257,24 @@ The store choice is never inferred from the environment. Whether authorization
 state should be durable is a decision about the application.
 
 Examples are real programs with assertions and they run in CI, so they cannot rot
-into fiction. Three of the five were wrong on their first run and the library's own
-write-time validation caught it every time — which is the argument for validating
-at `grant` rather than only at `check`.
+into fiction. Seven small ones were replaced by two applications
+(`hono-rbac`, `express-drizzle`) on the grounds that a fragment cannot show the
+order of a route's checks, where request context comes from, or what happens to a
+transaction when a document moves — and that the interesting failures in
+authorization are all of those. They were wrong on their first run too, and the
+library's own write-time validation caught every one: a bare `role:acme:editor` where
+the edge needed a userset, a wildcard edge asked to hold a `user:*` tuple, a
+`parent` tuple written the wrong way round, and a hand-maintained migration that had
+drifted from the schema. That is the argument for validating at `grant` rather than
+only at `check`.
+
+The second one also found a real engine bug rather than a real bug report.
+`listResources` memoised the `through` edges it had already followed on
+`type:relation`, so two objects of the same type shared a token and the second was
+never walked — every document below the second folder in a self-referential
+`folder → folder → folder` chain was invisible to the list while `check` allowed it.
+Fixed, with a regression test that holds the list to the check rather than to a
+literal.
 
 ## Quality gates (CI)
 
@@ -311,4 +325,4 @@ project does not want to spend CI minutes on yet.
 
 `git init` · add `LICENSE` (doesn't exist yet) · fill the 0-byte stubs (`README`, `AGENTS`, `CHANGELOG`, `CONTRIBUTING`, `SECURITY`, `.gitignore`, `.node-version`) · ~~rename the directory `keyman` -> `tsbouncer`~~ **done** · ~~rename the `KeymanStore` / `KeymanStoreCapabilities` types~~ **done**, they are `TupleStore` / `TupleStoreCapabilities`.
 
-**Housekeeping:** `IDEA.md` contradicts the plan in three places — `@Keyman/*` naming (§17, §18), the optional `check?` store contract (§12), and the CLI (§16, §19). It stays as the origin story, and it now **carries a header saying so**, listing those three reversals and pointing at this file. A stale design doc that disagrees with the code is worse than no design doc; a banner that names the disagreement is the cheap fix. `docs/architecture.md` is not being written — the locked decisions are recorded here, and the usage documentation is the examples.
+**Housekeeping:** `IDEA.md` contradicts the plan in three places — `@Keyman/*` naming (§17, §18), the optional `check?` store contract (§12), and the CLI (§16, §19). It stays as the origin story, and it now **carries a header saying so**, listing those three reversals and pointing at this file. A stale design doc that disagrees with the code is worse than no design doc; a banner that names the disagreement is the cheap fix. `docs/architecture.md` is not being written — the locked decisions are recorded here, and the usage documentation is the examples, which the site's `guides` section links to file by file.

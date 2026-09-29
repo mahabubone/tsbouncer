@@ -43,5 +43,7 @@ does not reorder the sidebar.
 ## The site is not the source of truth
 
 `PLAN.md` is the design record, `AGENTS.md` has the working rules, and the
-`examples/` directory holds runnable programs. This site explains how to use the
+`examples/` directory holds two runnable applications. The `guides` section links to
+their files one by one rather than pasting them, and `test/source-links.test.ts`
+fails if one of those links stops resolving. This site explains how to use the
 library; it does not decide what the library is.

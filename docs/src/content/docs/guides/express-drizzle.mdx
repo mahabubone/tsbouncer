@@ -1,0 +1,232 @@
+---
+title: A real-world documents API
+description: Express, Drizzle ORM, SQLite, and access rules that accumulated instead of being designed.
+section: Guides
+order: 22
+kind: guide
+---
+
+import Callout from '~/components/Callout.astro';
+
+A product that outgrew `owner_id`: a role system from the old monolith, a folder tree
+from the file manager, sharing, legal hold, data residency, a seat limit, and an
+account suspension switch. All live at once, over a real database.
+
+```bash
+pnpm --filter @tsbouncer-examples/express-drizzle start
+pnpm --filter @tsbouncer-examples/express-drizzle test
+```
+
+Source: [`examples/express-drizzle`](https://github.com/tsbouncer/tsbouncer/tree/main/examples/express-drizzle) ·
+[model](https://github.com/tsbouncer/tsbouncer/blob/main/examples/express-drizzle/src/model.ts) ·
+[seed](https://github.com/tsbouncer/tsbouncer/blob/main/examples/express-drizzle/src/seed.ts) ·
+[caller](https://github.com/tsbouncer/tsbouncer/blob/main/examples/express-drizzle/src/http.ts) ·
+[routes](https://github.com/tsbouncer/tsbouncer/blob/main/examples/express-drizzle/src/app.ts) ·
+[migration](https://github.com/tsbouncer/tsbouncer/blob/main/examples/express-drizzle/drizzle/0000_init.sql)
+
+## The structural decision
+
+**Domain rows in your tables, access edges in the tuple table.** A `documents` table
+knows its title and its folder. It does not know who may read it, and there is no
+`owner_id` column to migrate every time the access rules change. The two halves share
+nothing but a string.
+
+```ts ts-skip
+// src/db/schema.ts
+import { sqliteTsbouncerTuples } from '@tsbouncer/drizzle';
+
+export const tsbouncerTuples = sqliteTsbouncerTuples();
+```
+
+That is a *factory* rather than an exported constant so the table is declared in the
+module your migration tool reads, and so the store and the schema are guaranteed to be
+the same object — `drizzleStore(db, tsbouncerTuples)` is handed this exact instance,
+because Drizzle builds its SQL from the column metadata on it.
+
+## Three conditions, and why they are a list
+
+```ts setup
+import { defineCondition, permission } from 'tsbouncer';
+```
+
+```ts ts-fragment
+conditions: {
+  // The writer bound the region when the document was shared. The caller's region
+  // is not in the store at all, so it arrives with the request.
+  sameRegion: defineCondition(
+    'sameRegion',
+    (ctx) => {
+      const { region, callerRegion } = ctx;
+      if (typeof region !== 'string' || typeof callerRegion !== 'string') return false;
+      return region === callerRegion;
+    },
+    { params: { region: 'string' as const } },
+  ),
+
+  // No bound parameters, so no grant can rescue a suspended account.
+  notSuspended: defineCondition('notSuspended', (ctx) => ctx.suspended === false, {
+    params: {},
+  }),
+
+  // Both halves at once. The grant carries the allowance the project was bought
+  // with; the request carries what the tenant is using now.
+  withinSeatBudget: defineCondition(
+    'withinSeatBudget',
+    (ctx) => {
+      const { seats, usedSeats } = ctx;
+      if (typeof seats !== 'number' || typeof usedSeats !== 'number') return false;
+      return usedSeats < seats;
+    },
+    { params: { seats: 'number' as const } },
+  ),
+},
+```
+
+Every failure path denies: an undeclared condition, a missing or mistyped parameter, a
+predicate that returns false. There is no permissive fallback anywhere, and a
+predicate that throws is a denial rather than an exception in your route.
+
+<Callout type="caution" title="The safety of ABAC is the application's job">
+  A request may fill in a condition's *unbound* parameters. So the only safe source of
+  those parameters is your own database. `src/http.ts` builds the context from the
+  `users` and `organizations` tables and never reads a request parameter into it, and
+  there is a scenario that tries to forge it:
+
+  ```
+  a client cannot forge the context it is judged against   403
+  ```
+
+  Bound parameters are the opposite: a grant's own `context` is authoritative, and a
+  request supplying the same key is ignored rather than winning.
+</Callout>
+
+## Three rules that are easy to get wrong
+
+**A `parent` tuple names the parent as its subject.**
+
+Read that as: *folder:eng's parent is folder:root*.
+
+```ts ts-fragment
+subject: 'folder:root',
+relation: 'parent',
+resource: 'folder:eng',
+```
+
+The evaluator resolves `ttu('parent', …)` by reading `{ relation: 'parent', resource: <this object> }`
+and taking the *subject* of what it finds. Written the other way round it validates
+cleanly, and then every inheritance rule in the system resolves to nothing with no
+error anywhere.
+
+**A wildcard edge accepts no direct subject.** `shared: wildcard('user')` rejects
+`user:*` at write time, so a relation that has to hold a wildcard also declares the
+direct edge: `shared: relation('user').or(wildcard('user'))`. Which is what you want
+anyway — a share list that can name people and can also be flipped to everyone.
+
+**A ban beats the wildcard, and beats ownership.** Document 5 is public
+(`user:*` on `shared`) and Mallory is banned from it, so she gets 403 while everyone
+else gets 200. This falls out of evaluating both sides of the exclusion rather than
+returning early on the branch that succeeded, and it is the behaviour every "publish"
+feature has needed since the first one.
+
+## Segregation of duties, in two halves
+
+`document.publish` is an intersection of two relations on the same document, so a
+compromised owner account cannot publish alone:
+
+```ts ts-fragment
+publish: permission.allOf('owner', 'approver').except('banned'),
+```
+
+What a permission *cannot* say is "and someone else must agree", because whether two
+holders are the same person is a property of a request. So the route asks the second
+question itself, using `listSubjects` on `document.approve` to find the countersigners
+and refusing if the caller is one of them. Both halves are in the scenario table.
+
+## Moving a document
+
+A move has to change two things that must agree — the `folder_id` column and the
+`parent` relation authorization walks — or you have an orphaned grant, or a document
+whose access nobody can explain:
+
+```ts ts-skip
+let pending: Promise<unknown> | undefined;
+db.transaction((tx) => {
+  tx.update(documents).set({ folderId }).where(eq(documents.id, id)).run();
+  void drizzleStore(tx, tsbouncerTuples).delete({
+    kind: 'filter',
+    query: { resource: `document:${id}`, relation: 'parent' },
+  });
+  pending = drizzleStore(tx, tsbouncerTuples).write({
+    tuples: [{ subject: `folder:${folderId}`, relation: 'parent', resource: `document:${id}` }],
+  });
+});
+await pending;
+```
+
+The shape is not stylistic. `better-sqlite3` is synchronous and Drizzle *rejects* a
+transaction callback that returns a promise; on an async driver the same callback
+would commit before its work landed. The store detects which kind of client it holds
+by inspecting the client — not by probing a query builder, because builders expose
+`run`/`all`/`execute` on both kinds and a probe classifies every async driver as sync.
+On a client it does not recognise, it refuses to start rather than guessing.
+
+Two scenarios assert the transaction did its job: after the move the destination
+folder's owner can read the document, and the old path is gone.
+
+## Row state is not an edge
+
+Document 4 is under legal hold, which blocks edits. That is a column on the row, and
+the route enforces it with a 423 — deliberately *not* a condition. A condition's
+unbound parameters come from the request, so a hold enforced by one would be enforced
+by a value the caller supplies.
+
+Which is the general rule: **edges are the model's, row state is the application's.**
+Keeping that line is what stops `documents.on_hold` from quietly becoming something
+anybody can talk their way past.
+
+## Two queries that refuse to invent answers
+
+```ts ts-skip
+// src/app.ts — GET /api/v1/documents/5/who. Document 5 is public, so the answer is
+// { allOfTypes: ['user'], members: [], excluded: ['user:mallory'] } — symbolic, not
+// a roster of everyone in the database.
+const set = await authz.listSubjects({ permission: 'document.read', resource: 'document:5' });
+
+// src/app.ts — GET /api/v1/documents/1/why. The whole decision tree, and how many
+// store reads it took.
+const result = await authz.explain({
+  subject: 'user:mallory',
+  permission: 'document.read',
+  resource: 'document:1',
+});
+```
+
+A set that claims to be exhaustive and is not is the list-shaped version of a fail-open
+bug. And the `why` route deliberately does *not* require the permission it is
+explaining: the tree describes the caller's own request, and the moment you need it is
+when the answer was no.
+
+## The migration is hand-maintained, and tested
+
+`drizzle-kit` resolves the schema module with CommonJS semantics, and every package
+here is ESM-only with an `exports` map that has no `require` condition — so
+`drizzle-kit generate` fails with `ERR_PACKAGE_PATH_NOT_EXPORTED`. Adding a `require`
+condition would mean shipping a dual build, which this repository does not do.
+
+So `drizzle/0000_init.sql` is maintained by hand, and `test/schema.test.ts` is what
+holds it to the Drizzle schema: it fails if a column is missing, if a `NOT NULL` is
+missing, or if the unique index over the key columns is downgraded. That guard is not
+decorative — a column was added to the schema and not to the SQL during development,
+and the only symptom was a `SqliteError` on the first seed insert.
+
+## Limits, stated
+
+- `listResources` enumerates candidates and checks each, so its cost grows with the
+  number of resources of that type. The result carries `truncated` and the routes
+  return it, but a large deployment wants a narrower index.
+- `notSuspended` is a property of one grant, not a global account lock: a suspended
+  user still reaches a document that is public by wildcard. A hard lock means
+  conditioning every grant, or refusing the request in middleware before
+  authorization is asked. A test pins the current behaviour down.
+- `x-user-id` and `x-org` stand in for a session and a resolved host. In production
+  neither is a client-chosen header, and `src/http.ts` says so where it matters.

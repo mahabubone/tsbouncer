@@ -267,24 +267,27 @@ npm i @tsbouncer/kysely            # or drizzle / prisma, over your own client
 
 ## Examples
 
-[`examples/`](./examples) holds seven runnable programs with assertions — not
-snippets. Each one starts from a situation you are probably in. They run in CI, so
-they cannot rot into fiction:
+[`examples/`](./examples) holds two runnable applications with assertions — not
+snippets. Each starts from a situation you are probably in, listens on a real socket,
+and answers real requests. They run in CI, so they cannot rot into fiction:
 
 ```bash
 pnpm examples
 ```
 
-[`hand-rolled`](./examples/hand-rolled) is the one to start with: it writes the
-permission function you already have, shows you the two cases it gets wrong, and
-then replaces it.
+[`hono-rbac`](./examples/hono-rbac) is the one to start with. [Hono](https://hono.dev)
+routes and the whole access graph in a JSON file you can read and commit, with one
+idea: a document never names a person, it names a role, and the role names its
+holders. 19 live requests.
 
-[`express-app`](./examples/express-app) is the one to read if you are wiring this
-into something you already have. A real documents API over real HTTP, carrying
-RBAC, ReBAC and ABAC on one model, with 43 scenarios run against memory, a JSON
-file, and SQLite from the same application code.
+[`express-drizzle`](./examples/express-drizzle) is the one to read if you are wiring
+this into something you already have. A real documents API over Express, Drizzle ORM
+and SQLite, carrying RBAC, ReBAC and three ABAC conditions on one model, plus a
+transactional move that rewrites the access path atomically. 50 live requests.
 
-After that, [`vanilla`](./examples/vanilla) is the shortest useful program.
+Both are the source of truth for the [guides](https://tsbouncer.dev/guides), and a
+test in this repository fails if a guide's link to one of their files stops
+resolving.
 
 ## What this library guarantees
 

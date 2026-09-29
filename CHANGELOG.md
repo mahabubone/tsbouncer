@@ -10,7 +10,24 @@ build if they drift. Releases are cut by hand; see [CONTRIBUTING.md](./CONTRIBUT
 
 ## [Unreleased]
 
-Nothing published yet.
+### Changed
+
+- The examples are now two applications — `hono-rbac` (Hono and a JSON file) and
+  `express-drizzle` (Express, Drizzle ORM and SQLite) — replacing seven small
+  programs. The interesting failures in authorization are the order of a route's
+  checks, where request context comes from, and what a transaction does when a
+  document moves, and a fragment cannot show any of them. The documentation's
+  `guides` section links to their files one by one, and a test fails if one of
+  those links stops resolving.
+
+### Fixed
+
+- `listResources` lost inherited access in a self-referential chain. The walk
+  memoised the `through` relations it had followed on `type:relation`, so two
+  objects of the same type shared a token and the second was never walked — every
+  document below the second folder of a `folder → folder → folder` tree was
+  invisible to the list while `check` allowed it. The common case of inherited
+  access, and a list that quietly disagreed with a check.
 
 ## [1.0.0-dev.0]
 

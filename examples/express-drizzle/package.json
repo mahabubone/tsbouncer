@@ -1,0 +1,28 @@
+{
+  "name": "@tsbouncer-examples/express-drizzle",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "A real-world documents API: Express, Drizzle ORM, SQLite, and ReBAC + ABAC on one model.",
+  "scripts": {
+    "start": "tsx src/main.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tsbouncer/core": "workspace:*",
+    "@tsbouncer/drizzle": "workspace:*",
+    "better-sqlite3": "13.0.3",
+    "drizzle-orm": "0.45.3",
+    "express": "5.2.1",
+    "tsbouncer": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "7.6.13",
+    "@types/express": "5.0.6",
+    "@types/node": "26.6.3",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vitest": "5.0.2"
+  }
+}
