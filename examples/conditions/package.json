@@ -4,10 +4,16 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "start": "tsx src/main.ts"
+    "start": "tsx src/main.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "tsbouncer": "workspace:*"
   },
-  "description": "Attribute-gated access: the tuple binds, the request supplies."
+  "description": "Attribute-gated access: the tuple binds, the request supplies.",
+  "devDependencies": {
+    "@types/node": "26.6.3",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
 }

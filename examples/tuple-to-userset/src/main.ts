@@ -91,7 +91,7 @@ await authz.write([
 // The permission has to match the resource's type, so folders and documents are
 // checked separately. Asking for `document.read` on a folder is a type error,
 // not a denial.
-const cases: [string, string, string, boolean][] = [
+const cases: [string, string, string, string, boolean][] = [
   ['org admin reads a document', 'user:ada', 'document.read', 'document:api', true],
   ['org admin reads a sibling', 'user:ada', 'document.read', 'document:infra', true],
   ['org admin reads a folder', 'user:ada', 'folder.read', 'folder:design', true],

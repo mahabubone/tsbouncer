@@ -4,10 +4,16 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "start": "tsx src/main.ts"
+    "start": "tsx src/main.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "tsbouncer": "workspace:*"
   },
-  "description": "Inheriting access down a tree of objects."
+  "description": "Inheriting access down a tree of objects.",
+  "devDependencies": {
+    "@types/node": "26.6.3",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
 }

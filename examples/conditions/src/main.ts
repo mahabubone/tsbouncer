@@ -30,11 +30,18 @@ const model = defineModel({
     }),
   },
   conditions: {
-    // `org` is bound by the writer. `plan` is not in the store at all — it comes
-    // with the request, because it changes.
+    // Every value a predicate reads is `unknown` — `params` currently governs
+    // write-time validation only, not the predicate's own types. So narrow
+    // rather than cast: a bad shape is a denial, not a crash.
     activeSeat: defineCondition(
       'activeSeat',
-      (ctx) => ctx.plan === ctx.minimumPlan && ctx.seatsUsed < ctx.seatsTotal,
+      (ctx) => {
+        const { plan, seatsUsed, minimumPlan, seatsTotal } = ctx;
+        if (typeof plan !== 'string' || typeof seatsUsed !== 'number') return false;
+        if (typeof minimumPlan !== 'string' || typeof seatsTotal !== 'number')
+          return false;
+        return plan === minimumPlan && seatsUsed < seatsTotal;
+      },
       // Declaring `params` says what a *tuple* may bind. It is also the only way
       // a missing key becomes a reason rather than a silent `false`.
       { params: { minimumPlan: 'string' as const, seatsTotal: 'number' as const } },

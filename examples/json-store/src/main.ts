@@ -16,6 +16,10 @@ import {
  * The file is the point: it stays a plain JSON document rather than a build
  * artifact, so a test fixture, a seed script, and a local database are all the
  * same thing.
+ *
+ * The part worth copying is the second half — the file is written atomically, so
+ * a crash mid-write cannot truncate it, and it is re-read on demand, so a second
+ * client sees the first client's grants without a restart.
  */
 
 const model = defineModel({
