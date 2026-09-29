@@ -39,8 +39,7 @@ packages/stores/json     @tsbouncer/json
 packages/stores/kysely   @tsbouncer/kysely
 packages/stores/drizzle  @tsbouncer/drizzle
 packages/stores/prisma   @tsbouncer/prisma
-packages/stores/json     @tsbouncer/json
-packages/testkit         @tsbouncer/testkit   conformance suite
+packages/testkit         @tsbouncer/testkit   conformance + golden suites
 packages/tsbouncer       tsbouncer            batteries-included re-export
 examples/                runnable, verified in CI (`pnpm examples`)
 ```
@@ -135,7 +134,12 @@ Two rules govern them, and both exist because the alternative is a silent lie:
 - Public API errors extend `AuthorizationError` and carry a stable `code`.
 - Every new public function needs a type test or a runtime test. Prefer both for
   anything touching ref parsing.
-- Keep comments out of the code. Explain *why* in `PLAN.md` / `docs/`, not inline.
+- Keep comments out of the **library**. Explain *why* in `PLAN.md`, not inline.
+  **Examples are the exception** and are commented heavily on purpose: they are
+  the documentation a reader actually lands on, and a comment in an example costs
+  nothing at runtime and teaches the reason behind a shape. `AGENTS.md` used to
+  forbid this everywhere while the examples were doing exactly it, which is a rule
+  a contributor cannot follow and does not learn from.
 
 ## Correctness traps
 

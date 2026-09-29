@@ -1,5 +1,23 @@
 # Keyman - Nextgen authorization tool for modern apps
 
+> **This is the original pitch, kept as a record. It is not the spec.**
+>
+> The project was renamed `Keyman` -> `tsbouncer`, and the name is retained here
+> only so the history reads honestly. Three things in this document were
+> deliberately reversed and are **wrong**:
+>
+> 1. **Naming** (§17, §18) — `@Keyman/*` became `@tsbouncer/*`, and `KeymanStore`
+>    is now `TupleStore`.
+> 2. **The store contract** (§12) — this proposes an *optional* `check?` fast path
+>    per adapter. That was rejected: it is the most likely route to a subtly-wrong
+>    authorization library, since wildcard, rewrite, tuple-to-userset, and exclusion
+>    semantics would have to be reimplemented per store. Filtered reads are the
+>    only mandatory primitive.
+> 3. **The CLI** (§16, §19) — there will not be one. testkit is the quality gate.
+>
+> [PLAN.md](./PLAN.md) records the locked decisions; [AGENTS.md](./AGENTS.md) has
+> the working rules. Where this document and those disagree, they are right.
+
 ## Revised positioning
 
 > **Keyman is a TypeScript-native authorization graph SDK for defining authorization data, relationships, policies, and evaluating access — backed by pluggable storage.**

@@ -89,6 +89,36 @@ await authz.grant({
 References are opaque strings. `tsbouncer` never resolves `user:alice` to a row in
 your `users` table, and never needs a foreign key into your domain schema.
 
+## Types
+
+`can()` takes three plain `string`s, because the store is schemaless and the model is
+built at runtime. The model is still known statically, so the legal values are
+derivable:
+
+```ts
+import type { ModelShapeOf, ObjectRefOf, PermissionOf, SubjectRefOf } from 'tsbouncer';
+import { model } from './model.js';
+
+type Shape = ModelShapeOf<typeof model>;
+
+type AnySubject = SubjectRefOf<Shape>;     // 'user:…' | 'team:…#member' | …
+type AnyResource = ObjectRefOf<Shape>;    // 'user:…' | 'document:…' | …
+type AnyPermission = PermissionOf<Shape>; // 'document.read' | 'team.read' | …
+```
+
+The permission union is exact, and it is the string you retype most. A typo is a
+build failure, not a test failure:
+
+```
+error TS2820: Type '"document.riad"' is not assignable to type 'DocumentPermission'.
+  Did you mean '"document.read"'?
+```
+
+Reference unions are looser than they look — `` `user:${string}` `` also matches
+`user:x#member`, since `${string}` swallows the `#`. Closing that needs a branded id
+type. This is "pragmatic typing" on purpose: the model carries the names, the store
+carries no schema, and nothing pretends otherwise.
+
 ## Storage
 
 One primitive is mandatory: a filtered tuple read. Everything else — reverse walks,
@@ -237,14 +267,24 @@ npm i @tsbouncer/kysely            # or drizzle / prisma, over your own client
 
 ## Examples
 
-[`examples/`](./examples) holds five runnable programs with assertions — not
-snippets. They run in CI, so they cannot rot into fiction:
+[`examples/`](./examples) holds seven runnable programs with assertions — not
+snippets. Each one starts from a situation you are probably in. They run in CI, so
+they cannot rot into fiction:
 
 ```bash
 pnpm examples
 ```
 
-`vanilla`, `json-store`, `conditions`, `tuple-to-userset`, `multi-tenant`.
+[`hand-rolled`](./examples/hand-rolled) is the one to start with: it writes the
+permission function you already have, shows you the two cases it gets wrong, and
+then replaces it.
+
+[`express-app`](./examples/express-app) is the one to read if you are wiring this
+into something you already have. A real documents API over real HTTP, carrying
+RBAC, ReBAC and ABAC on one model, with 43 scenarios run against memory, a JSON
+file, and SQLite from the same application code.
+
+After that, [`vanilla`](./examples/vanilla) is the shortest useful program.
 
 ## Requirements
 

@@ -1,9 +1,9 @@
 {
-  "name": "@tsbouncer-examples/vanilla",
+  "name": "@tsbouncer-examples/hand-rolled",
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "The smallest useful tsbouncer model: users, teams, documents.",
+  "description": "Replacing a hand-rolled permission function, and the three bugs it hides.",
   "scripts": {
     "start": "tsx src/main.ts",
     "typecheck": "tsc --noEmit"
