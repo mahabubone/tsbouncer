@@ -22,10 +22,9 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        # `engines` claims >=20.11, so the floor is a version, not a channel.
-        # The rest of the range matters too: 20.19+/22.12+ changed `require(esm)`,
-        # which is the CJS story `attw` warns about.
-        node: ['20.11', '20', '22', '24']
+        # 22 and 24 only, per maintainer decision. Note `engines` still
+        # advertises >=20.11 — the floor is claimed, not CI-verified.
+        node: ['22', '24']
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -78,7 +77,7 @@ jobs:
         # One artifact per run, not one per matrix cell — four copies of the same
         # numbers are four chances for a name collision and nothing else. The glob
         # is `**` because the store plugins live one level deeper.
-        if: matrix.os == 'ubuntu-latest' && matrix.node == '20.11'
+        if: matrix.os == 'ubuntu-latest' && matrix.node == '22'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: coverage
@@ -90,7 +89,7 @@ jobs:
         # "What does this library actually guarantee?" should be answerable by
         # opening one file, without reading the implementation. Same job, same
         # runner — an artifact is not worth a new machine.
-        if: matrix.os == 'ubuntu-latest' && matrix.node == '20.11'
+        if: matrix.os == 'ubuntu-latest' && matrix.node == '22'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: contract-report

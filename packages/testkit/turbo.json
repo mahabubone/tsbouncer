@@ -1,0 +1,9 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "build": { "dependsOn": ["tsbouncer#build"] },
+    "typecheck": { "dependsOn": ["tsbouncer#build"] },
+    "test": { "dependsOn": ["tsbouncer#build"] },
+    "test:coverage": { "dependsOn": ["tsbouncer#build"] }
+  }
+}
