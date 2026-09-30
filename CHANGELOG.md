@@ -10,6 +10,22 @@ build if they drift. Releases are cut by hand; see [CONTRIBUTING.md](./CONTRIBUT
 
 ## [Unreleased]
 
+### Added
+
+- The `Cache` port and `withCache` memoization: `can`/`check` consult any
+  cache, invalidate by resource on every write, require a model-versioned
+  namespace, and degrade to uncached evaluation rather than risk a stale
+  allow. `cacheConformance` in testkit mirrors `storeConformance`.
+- `@tsbouncer/in-memory` and `@tsbouncer/redis` implement both ports
+  (`memoryCache`, `redisCache` with server-side TTL).
+
+### Changed
+
+- Backends moved out of the root package into adapter packages —
+  `@tsbouncer/in-memory`, `@tsbouncer/json-file`, `@tsbouncer/defaults` — so
+  `tsbouncer` is kernel and ports only. Import paths change accordingly
+  (`tsbouncer/memory` is now `@tsbouncer/in-memory`, and so on).
+
 ## [1.0.0-preview.1] - 2026-09-29
 
 The first public preview. One `tsbouncer` package, three store plugins, and a
@@ -27,13 +43,14 @@ docs site — all staged, none published yet. Preview versions chain as
 
 ### Changed
 
-- **One package.** `packages/core`, `packages/stores/memory`, and
-  `packages/stores/json` are folded into `tsbouncer` subpaths — the kernel at
-  `.`, `tsbouncer/memory`, `tsbouncer/json`, `tsbouncer/defaults` — so an app
-  never loads a backend it did not ask for. The root entry pulls no storage and
-  no `node:*` imports. `@tsbouncer/kysely`, `@tsbouncer/drizzle`,
-  `@tsbouncer/prisma`, and `@tsbouncer/testkit` stay separate; the testkit takes
-  the kernel as a peer dependency.
+- **Ports and adapters.** The kernel (`tsbouncer`) declares two ports —
+  `TupleStore` and the new `Cache` contract — and each backend is a separate
+  plugin package exposing what it implements: `@tsbouncer/in-memory` and
+  `@tsbouncer/redis` do store + cache, `@tsbouncer/json-file`, `@tsbouncer/kysely`,
+  `@tsbouncer/drizzle`, and `@tsbouncer/prisma` do store, `@tsbouncer/defaults`
+  chooses. `@tsbouncer/testkit` checks both with `storeConformance` and the new
+  `cacheConformance`. `withCache` memoizes `can`/`check` with resource-scoped
+  invalidation. The root entry pulls no storage and no `node:*` imports.
 - A duplicate write names the rule it broke: one edge holds one param-set per
   condition, so a re-binding is rejected on `insert` (replace it with `upsert`).
   The message is asserted by every adapter's suite, and by conformance for the

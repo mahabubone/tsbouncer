@@ -56,6 +56,7 @@ try {
 | `invalid_model` | `defineModel` was given a model that does not hold together | a boot-time bug |
 | `evaluation_limit` | a depth, node, or time budget ran out | fail closed, and log it |
 | `store_error` | the store rejected a read or write | a database problem, not a denial |
+| `cache_error` | a cache rejected a `set`, or a memo was misconfigured | an infrastructure problem or a boot-time bug — never served as an answer |
 
 ## The distinction that matters
 

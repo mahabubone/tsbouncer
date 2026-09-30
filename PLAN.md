@@ -356,7 +356,7 @@ Locked decisions (no relitigation without editing this section first):
 | F3 | `Decision` and `ExplainResult` gain `truncated: boolean`, forwarded from `EvaluationOutcome`. Additive only. |
 | F5 | `tupleKey` uses an unambiguous encoding (no `'|'`-joined fields). SQL stores are unaffected (separate columns). |
 | F6 | The full-store scan behind `listResources` and the materialized result lists are disclosed; the query layer honours `limit`/`cursor` where it does not change semantics. Full streaming lists are v1.1, with a filed issue. |
-| F4 | The comparison's transactional-reads story is scoped to the kernel + SQL adapters — the `tsbouncer/memory` and `tsbouncer/json` stores are non-transactional. Docs-only. |
+| F4 | The comparison's transactional-reads story is scoped to the kernel + SQL adapters — the `@tsbouncer/in-memory` and `@tsbouncer/json-file` stores are non-transactional. Docs-only. |
 
 Phases: **0** lock semantics here (this section) → **1** F3 + F5 with tests → **2** F1 error message + contract clause + docs → **3** F2 context threading + `expand`↔`check` agreement test → **4** F6 disclosure + `limit`/`cursor` groundwork → **5** comparison page + docs sync (incl. F4) with `docs:test` / `docs:build` / link check → **6** settle gates (`lint`, `versions`, `typecheck`, `build`, `pack:check`, `test:coverage` 90% gate, `examples`, testkit green on all five stores, regenerated contract report) plus `CHANGELOG.md` entry and a written hand-cut publish/tag procedure. Phases 1–2 and 3–4 are independent after Phase 0 and may run as parallel workstreams.
 

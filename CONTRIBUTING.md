@@ -25,23 +25,33 @@ pnpm lint
 Node `>=22`. The repo is ESM-only; don't add CommonJS, `require()`, or
 `export =` to anything.
 
-## Writing a store
+## Writing a store — or a cache
 
-The conformance suite in `packages/testkit` is the gate. Any new store must pass it
-in full — a store that fails is not finished. Copy `packages/tsbouncer/src/memory`
-as a starting point, then run the suite against yours.
+The conformance suites in `packages/testkit` are the gate. Any new store must
+pass `storeConformance` in full, and any new cache must pass
+`cacheConformance` — a port that fails is not finished. Copy
+`packages/stores/in-memory` as a starting point (it implements both ports),
+then run the suites against yours:
 
 ```ts
-import { storeConformance } from '@tsbouncer/testkit';
+import { cacheConformance, storeConformance } from '@tsbouncer/testkit';
+import { myCache } from '../src/index.js';
 import { myStore } from '../src/index.js';
 
 storeConformance({
   name: 'myStore',
   create: () => myStore(),
 });
+
+cacheConformance({
+  name: 'myCache',
+  create: () => myCache(),
+});
 ```
 
 Conditions are never evaluated in a store. Stores move tuples; the engine decides.
+Cache contents are losable by definition — a miss must always be safe, and
+`undefined` is the miss signal, never a storable value.
 
 ## Local QA beyond SQLite
 

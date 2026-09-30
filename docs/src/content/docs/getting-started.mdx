@@ -10,16 +10,15 @@ import Callout from '~/components/Callout.astro';
 ## Install
 
 ```bash
-npm i tsbouncer                    # kernel, memory + JSON stores, defaults
-npm i @tsbouncer/kysely            # or drizzle / prisma, over your own client
+npm i tsbouncer @tsbouncer/in-memory   # kernel plus the process-local backend
 ```
 
-`tsbouncer` is one package with subpath entries: the root is the kernel with
-zero dependencies, `@tsbouncer/in-memory` and `@tsbouncer/json-file` hold the two stores
-that need nothing external, and `@tsbouncer/defaults` picks one for you. If you
-already have Kysely, Drizzle, or Prisma, import the kernel from `tsbouncer` and
-the matching store — this package deliberately depends on no ORM, and neither
-should your install graph because you read a README.
+`tsbouncer` is the kernel and two ports — nothing else. Backends are separate
+plugin packages: `@tsbouncer/in-memory` and `@tsbouncer/json-file` need nothing
+external, `@tsbouncer/redis` needs a server, `@tsbouncer/kysely`,
+`@tsbouncer/drizzle`, and `@tsbouncer/prisma` wrap the client you already have,
+and `@tsbouncer/defaults` picks one for you. Install exactly the backends you
+use; importing the root never loads one you did not ask for.
 
 ESM only. There is no CommonJS build, and `require()` will not work. Node 20.11 or
 newer.

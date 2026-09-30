@@ -1,9 +1,10 @@
 # @tsbouncer/testkit
 
-The conformance suite every `TupleStore` must pass, plus a golden dataset with a fixed
-expected outcome.
+The conformance suites every port implementation must pass, plus a golden dataset
+with a fixed expected outcome.
 
-**There is no CLI. The suite is the gate.** A store that does not pass it is not done.
+**There is no CLI. The suites are the gate.** A store that does not pass
+`storeConformance`, or a cache that does not pass `cacheConformance`, is not done.
 
 ```bash
 npm i -D @tsbouncer/testkit
@@ -39,6 +40,19 @@ Do not silence a failure you have not understood — and note that `capabilities
 self-reported in both directions: a store that claims a capability it does not honour
 is caught by the suite, and a store that reports `pagination: false` is simply not
 asked for a cursor.
+
+Caches get the same treatment through `cacheConformance`, including
+capability-gated TTL tests:
+
+```ts
+import { cacheConformance } from '@tsbouncer/testkit';
+import { memoryCache } from '@tsbouncer/in-memory';
+
+cacheConformance({
+  name: 'memoryCache',
+  create: () => memoryCache(),
+});
+```
 
 ## Golden dataset
 

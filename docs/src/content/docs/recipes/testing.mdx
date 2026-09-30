@@ -10,7 +10,7 @@ import Callout from '~/components/Callout.astro';
 
 ```ts setup
 import { expect, it, beforeEach, describe } from 'vitest';
-import type { TupleStore } from 'tsbouncer';
+import type { Cache, TupleStore } from 'tsbouncer';
 
 declare function myStore(): TupleStore;
 ```
@@ -30,6 +30,22 @@ storeConformance({
 
 Capabilities you list in `skip` are skipped. Capabilities you *do not* list are
 asserted to work — so do not silence a failure you have not understood.
+
+Caches get the same treatment, through the same package:
+
+```ts
+import { cacheConformance } from '@tsbouncer/testkit';
+
+declare function myCache(): Cache;
+
+cacheConformance({
+  name: 'my-cache',
+  create: () => myCache(),
+});
+```
+
+TTL tests are capability-gated like pagination: a cache without `ttl` support
+skips them by listing it, and everything else is asserted.
 
 Then run the golden dataset, which proves your store answers identically to every
 other one:

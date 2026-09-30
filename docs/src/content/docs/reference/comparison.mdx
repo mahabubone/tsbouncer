@@ -256,7 +256,10 @@ An honest catalog lists its own gaps first.
 - **No policy language.** Predicates are TypeScript functions. There is no CEL,
   no Rego, and no way for a non-programmer to edit a rule without a release.
 - **No change feed.** `watch` exists as a capability in the store contract and no
-  adapter implements it, so nothing here invalidates a cache you built.
+  adapter implements it, so cross-process invalidation has no push channel.
+  What `withCache` invalidates is its own memo entries, on writes made through
+  the wrapped client — writes that bypass it (another process, another client)
+  are invisible until TTL expiry or namespace rotation.
 - **No incremental or precomputed evaluation.** Every check is a walk with a
   budget; there is no materialized decision graph to keep warm.
 - **Not everything is tested.** The SQL adapters declare `sqlite | postgres |

@@ -31,7 +31,8 @@ holders, so onboarding someone is one write rather than one per document.
 `src/model.ts`:
 
 ```ts setup
-import { createAuthz, defineModel, defineType, permission, relation } from 'tsbouncer';
+import { createAuthz, defineModel, defineType, permission, relation, withCache } from 'tsbouncer';
+import { memoryCache } from '@tsbouncer/in-memory';
 import { jsonStore } from '@tsbouncer/json-file';
 import assert from 'node:assert/strict';
 ```
@@ -273,6 +274,26 @@ assert.strictEqual(denied.allowed, false);
 Keep both. The transcript shows the system working end to end; the assertions pin
 the decisions so a later model edit that silently moves them fails loudly instead
 of shipping.
+
+## Memoize the hot path
+
+Reads usually outnumber writes by orders of magnitude, so wrap the client once
+at boot and stop paying full evaluations for repeated questions:
+
+```ts
+const cached = withCache(authz, memoryCache(), { namespace: 'docs-api-v1' });
+
+assert.strictEqual(await cached.can('user:dave', 'document.read', 'document:1'), false);
+await cached.grant({ subject: 'user:dave', relation: 'viewer', resource: 'document:1' });
+assert.strictEqual(await cached.can('user:dave', 'document.read', 'document:1'), true);
+```
+
+The middle line is the whole point: the `false` was memoized, the grant
+invalidated it by resource, and the last check re-evaluated instead of serving
+the stale denial. The namespace is required and should be versioned with the
+model — two applications sharing one cache must never read each other's
+decisions. Swap `memoryCache()` for `redisCache` when the memo needs to outlive
+the process.
 
 ## When to stop reading
 

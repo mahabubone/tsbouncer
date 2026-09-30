@@ -17,8 +17,8 @@ These are decided. Do not relitigate them in PRs; change `PLAN.md` deliberately 
 2. **No framework tooling.** No Express/Hono/Fastify/Nest middleware, no HTTP layer,
    no auth, no sessions, no JWT/OAuth. Ever. The app owns all of it.
 3. **The `tsbouncer` root entry has zero dependencies and zero `node:*` imports.**
-   Only `tsbouncer/json` may touch `fs`. Subpaths (`./memory`, `./json`,
-   `./defaults`) exist so an app never loads a backend it did not ask for.
+   Only `@tsbouncer/json-file` may touch `fs`. Backends are separate adapter
+   packages, one per port they implement — never add a backend to the root.
 4. **Filtered reads are the only mandatory store primitive.** Do not add an optional
    `check?`/`listObjects?` fast path. Reverse walks and `expand` derive from `read()`.
    Reimplementing wildcard/rewrite/TTU/exclusion semantics per-adapter is how this
@@ -34,12 +34,15 @@ These are decided. Do not relitigate them in PRs; change `PLAN.md` deliberately 
 ## Layout
 
 ```
-packages/tsbouncer            tsbouncer            kernel at `.`, `./memory`, `./json`, `./defaults`
+packages/tsbouncer            tsbouncer            kernel + ports at `.`, nothing else
+packages/stores/in-memory    @tsbouncer/in-memory    store + cache
+packages/stores/json-file     @tsbouncer/json-file     store over one file
+packages/stores/redis         @tsbouncer/redis         store + cache
 packages/stores/kysely        @tsbouncer/kysely
 packages/stores/drizzle       @tsbouncer/drizzle
 packages/stores/prisma        @tsbouncer/prisma
-packages/testkit              @tsbouncer/testkit   conformance + golden suites
-packages/tsbouncer       tsbouncer            batteries-included re-export
+packages/stores/defaults      @tsbouncer/defaults      chooses in-memory or json-file
+packages/testkit              @tsbouncer/testkit   store + cache conformance, golden suites
 examples/                two runnable apps, verified in CI (`pnpm examples`)
 docs/                    Astro 7 docs site; every snippet is type-checked
 ```

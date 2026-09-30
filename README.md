@@ -270,8 +270,7 @@ Not published yet — `1.0.0-preview.1` is staged in this repo, not shipped.
 When it is:
 
 ```bash
-npm i tsbouncer                    # kernel, memory + JSON stores, defaults
-npm i @tsbouncer/kysely            # or drizzle / prisma, over your own client
+npm i tsbouncer @tsbouncer/in-memory   # kernel plus the process-local backend
 ```
 
 ## Examples
