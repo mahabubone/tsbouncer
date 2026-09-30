@@ -119,6 +119,11 @@ fix(core): evaluate both sides of exclusion before returning
 docs: document store capabilities
 ```
 
+Conventional Commits, enforced by a `commit-msg` hook (commitlint with
+`@commitlint/config-conventional`). Keep the subject lowercase after the
+`type:` prefix — `docs: hacktoberfest readiness`, not `docs: Hacktoberfest
+readiness` — or the commit is rejected before it lands.
+
 ## Cutting a release
 
 Releases are a maintainer's job, cut by hand — no changesets, no CI pipelines,
