@@ -43,6 +43,32 @@ storeConformance({
 
 Conditions are never evaluated in a store. Stores move tuples; the engine decides.
 
+## Local QA beyond SQLite
+
+CI is SQLite-only by decision — no service containers, no flakes from shared
+infrastructure. Everything else runs locally, env-gated so a missing server
+skips instead of failing:
+
+```bash
+# PostgreSQL 16 for the kysely adapter (conformance + golden).
+docker run -d --name tsbouncer-qa-pg -e POSTGRES_PASSWORD=tsbouncer-qa \
+  -e POSTGRES_USER=tsbouncer -e POSTGRES_DB=tsbouncer \
+  -p 5544:5432 postgres:16-alpine
+TSBUNCER_PG_URL=postgresql://tsbouncer:tsbouncer-qa@127.0.0.1:5544/tsbouncer \
+  pnpm --filter @tsbouncer/kysely exec vitest run \
+    test/conformance-pg.test.ts test/golden-pg.test.ts
+
+# Redis for the redis adapter (conformance + golden). Any Redis 7+ server;
+# tests namespace themselves with uuid prefixes and delete only those, so
+# never point this at production — and never FLUSHDB.
+TSBUNCER_REDIS_URL=redis://127.0.0.1:6379 \
+  pnpm --filter @tsbouncer/redis test
+```
+
+Then the express tour, still on SQLite, to confirm nothing regressed end to
+end: `pnpm --filter @tsbouncer-examples/express-drizzle test`. QA is green when
+all three are.
+
 ## Pull requests
 
 - One logical change per PR. Refactors that don't change behavior belong on their own.

@@ -2,7 +2,7 @@
 /**
  * Every published package is one version, and it is the one in the root.
  *
- * Five packages drifting to four versions is how a consumer ends up with two
+ * Six packages drifting to five versions is how a consumer ends up with two
  * copies of the kernel and a type error that reads like a TypeScript bug. There is
  * no release tooling in this repo, so this is the guard: zero dependencies, and it
  * runs in the existing CI job rather than adding one.

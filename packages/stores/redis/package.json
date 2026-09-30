@@ -1,7 +1,7 @@
 {
-  "name": "@tsbouncer/kysely",
+  "name": "@tsbouncer/redis",
   "version": "1.0.0-preview.1",
-  "description": "TupleStore over an application-owned Kysely instance.",
+  "description": "TupleStore over an application-owned Redis client. Fast shared store and read-through cache backing.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -11,12 +11,12 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mahabubone/tsbouncer.git",
-    "directory": "packages/stores/kysely"
+    "directory": "packages/stores/redis"
   },
   "bugs": {
     "url": "https://github.com/mahabubone/tsbouncer/issues"
   },
-  "homepage": "https://github.com/mahabubone/tsbouncer/tree/main/packages/stores/kysely#readme",
+  "homepage": "https://github.com/mahabubone/tsbouncer/tree/main/packages/stores/redis#readme",
   "publishConfig": {
     "access": "public"
   },
@@ -35,8 +35,8 @@
     "authorization",
     "authz",
     "store",
-    "kysely",
-    "sql",
+    "redis",
+    "cache",
     "esm"
   ],
   "scripts": {
@@ -48,7 +48,7 @@
     "pack:check": "publint --strict && attw --pack . --profile esm-only"
   },
   "peerDependencies": {
-    "kysely": ">=0.29.0 <0.30"
+    "redis": ">=6.2.0 <7"
   },
   "dependencies": {
     "tsbouncer": "workspace:*"
@@ -56,13 +56,9 @@
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
     "@tsbouncer/testkit": "workspace:*",
-    "@types/better-sqlite3": "7.6.13",
-    "@types/pg": "^8.23.1",
     "@vitest/coverage-v8": "5.0.2",
-    "better-sqlite3": "13.0.3",
-    "kysely": "0.29.6",
-    "pg": "^8.23.0",
     "publint": "0.3.24",
+    "redis": "^6.2.1",
     "tsup": "8.5.1",
     "typescript": "5.9.3",
     "vitest": "5.0.2"

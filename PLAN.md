@@ -315,7 +315,7 @@ was found rather than by design:
 
 ## Release state
 
-All five packages carry `1.0.0-preview.1` and `pnpm versions` fails the build if they
+All six packages carry `1.0.0-preview.1` and `pnpm versions` fails the build if they
 drift. There is no publish automation and none is planned yet: the release is a
 hand-cut publish in dependency order plus a git tag, exactly as
 [CONTRIBUTING.md](./CONTRIBUTING.md#cutting-a-release) prescribes. That is deliberate
@@ -376,3 +376,4 @@ staged state is marked ready. This phase restructures and stages.
 | Version | Preview chain `1.0.0-preview.N` (`.1`, `.2`, … — plain numeric identifiers, so precedence stays chronological; month names would sort lexically and break it), single version enforced everywhere as today. The `v` prefix lives on git tags only, never in `package.json`. Final is `1.0.0`. |
 | Deploy | Pages deploy automation is deferred with the other pipes; this phase proves the SSG output (`docs:build` under `base`) and documents the manual publish steps. |
 | Build order | `@tsbouncer/testkit` takes the kernel as a **peer** dependency (one kernel per install, never two), so turbo's `^build` does not order it after `tsbouncer#build` — and `tsbouncer` dev-depends on the testkit for its store suites, so a blanket edge would be a cycle. Each side declares its edge explicitly instead: `packages/testkit/turbo.json` orders its tasks after `tsbouncer#build`, and `packages/tsbouncer/turbo.json` narrows `build` to `dependsOn: []` (the kernel build needs nothing). CI caught the missing edge on a clean tree; local builds had masked it with stale `dist/`. |
+| Stores | Focus is InMemory, JSON-file, Redis, SQLite, and PostgreSQL only. **CI stays SQLite-only** — no service containers, ever; `@tsbouncer/redis` and Postgres runs are env-gated local QA (`TSBUNCER_REDIS_URL`, `TSBUNCER_PG_URL`), skipped when unset. **Redis is both roles**: the fast shared store deployments check against hot, and a supported alternate backend — one implementation, Lua-atomic ops over plain index sets, no modules. `watch` stays `false` everywhere until the contract grows a subscription primitive. |

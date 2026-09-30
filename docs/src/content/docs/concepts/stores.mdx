@@ -73,9 +73,10 @@ suite is written to catch exactly that.
 | --- | --- | --- |
 | `tsbouncer/memory` | nothing — process-local | in-process |
 | `tsbouncer/json` | a file path | on disk, atomic |
-| `@tsbouncer/kysely` | your `Kysely` instance | SQLite |
+| `@tsbouncer/kysely` | your `Kysely` instance | SQLite in CI, PostgreSQL locally |
 | `@tsbouncer/drizzle` | your `db` and table object | SQLite (sync) and libsql (async) |
 | `@tsbouncer/prisma` | your `PrismaClient` | SQLite via Prisma 7 |
+| `@tsbouncer/redis` | your Redis `client` | local server via env gate |
 
 `memoryStore` for tests, `jsonStore` for fixtures and local development, and one
 of the SQL adapters for anything with more than one process. Whether authorization
@@ -99,12 +100,15 @@ raw.exec(createTupleTableSql('sqlite')); // 'postgres' and 'mysql' are also avai
 
 It is the same SQL the conformance suite runs, against a real database.
 
-<Callout type="warning" title="Postgres and MySQL are supported but not tested">
-`DIALECTS` is `sqlite | postgres | mysql`, and only SQLite and libsql are exercised
-in CI. So "switch adapters without migrating data" is verified across *query
-builders* and **not** across *databases* — and the dialect is exactly where
-`insert` versus `upsert` diverges. Treat Postgres and MySQL as untested until you
-have run the suite against them.
+<Callout type="warning" title="Postgres is QA'd locally, MySQL is not tested anywhere">
+`DIALECTS` is `sqlite | postgres | mysql`, and CI exercises only SQLite and
+libsql — on purpose, to keep CI free of service containers. The kysely adapter
+additionally runs the full conformance and golden suites against real
+PostgreSQL via an env-gated harness (see the Local QA procedure in
+`CONTRIBUTING.md`).
+MySQL has no runner anywhere yet: "switch adapters without migrating data" is
+verified across query builders and against Postgres, **not** across databases —
+and the dialect is exactly where `insert` versus `upsert` diverges.
 </Callout>
 
 ## The one table
