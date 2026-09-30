@@ -1,0 +1,9 @@
+{
+  "name": "@tsbouncer/json-file",
+  "version": "1.0.0-preview.1",
+  "exports": "./dist/index.js",
+  "publish": {
+    "exclude": ["!dist/"]
+  },
+  "license": "Apache-2.0"
+}

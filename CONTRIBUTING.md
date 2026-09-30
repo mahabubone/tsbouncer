@@ -171,37 +171,39 @@ registry default can never make a release private. Expect an OTP prompt. Verify
 after each publish (`npm view <name>@preview version`) before moving to the
 next package.
 
-### 7. JSR, one package at a time
+### 7. JSR, one scoped package at a time
 
-Each published package needs a `jsr.json` first:
+Each scoped package carries a `jsr.json` (checked by `pnpm versions` for name
+and version drift). The unscoped root `tsbouncer` is npm-only — JSR requires
+`@scope/name`, so there is nothing to configure there:
 
 ```json
 {
-  "name": "@tsbouncer/tsbouncer",
+  "name": "@tsbouncer/redis",
   "version": "1.0.0-preview.1",
-  "exports": {
-    ".": "./dist/index.js",
-    "./memory": "./dist/memory.js",
-    "./json": "./dist/json.js",
-    "./defaults": "./dist/defaults.js"
-  }
+  "exports": "./dist/index.js",
+  "license": "Apache-2.0",
+  "publish": { "exclude": ["!dist/"] }
 }
 ```
 
-Keep `version` in lockstep with `package.json` by hand until tooling exists,
-and every subpath in `exports` — JSR serves exactly what is listed. Run the
-dry run first: it also runs JSR's slow-types check, which hand-written
-declarations sometimes fail.
-Then, per package:
+Three gotchas, all learned the hard way — keep them in mind before "simplifying":
+- `dist/` is gitignored, so JSR excludes it too. The `publish.exclude`
+  negation (`!dist/`, exactly that spelling) un-excludes it.
+- Every package needs a `LICENSE` file on disk, not just the license field.
+- Our entrypoints are compiled JS, so every publish needs `--allow-slow-types`
+  until the packages ship TypeScript sources.
+
+Then, per scoped package:
 
 ```bash
-npx jsr publish --dry-run
-npx jsr publish
+npx jsr publish --dry-run --allow-slow-types
+npx jsr publish --allow-slow-types
 ```
 
 Slow publishes only — `--allow-dirty` is how a half-finished tree ends up on a
-registry. JSR resolves `jsr:` and `npm:` specifiers; our imports are relative
-`./x.js`, so nothing else changes.
+registry (it appears in dry-run commands above only because local verification
+runs on dirty trees).
 
 ### 8. Docs
 

@@ -47,6 +47,25 @@ for (const dir of packageDirs()) {
   if (pkg.version !== expected) {
     problems.push(`${pkg.name} is ${pkg.version}, expected ${expected}`);
   }
+  // A jsr.json that disagrees with package.json ships a different version to a
+  // different registry under the same release. Every scoped package carries
+  // one, so a missing or drifting file fails here rather than at publish time.
+  // The unscoped root is exempt: JSR requires @scope/name, so `tsbouncer`
+  // ships to npm only.
+  if (pkg.name === 'tsbouncer') continue;
+  let jsr;
+  try {
+    jsr = read(join(dir, 'jsr.json'));
+  } catch {
+    problems.push(`${pkg.name} has no jsr.json`);
+    continue;
+  }
+  if (jsr.name !== pkg.name) {
+    problems.push(`${pkg.name}/jsr.json names ${jsr.name}`);
+  }
+  if (jsr.version !== expected) {
+    problems.push(`${pkg.name}/jsr.json is ${jsr.version}, expected ${expected}`);
+  }
 }
 
 if (found.length === 0) problems.push('no published packages found under packages/');
