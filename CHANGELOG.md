@@ -8,7 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Every published package carries the same version, and `pnpm versions` fails the
 build if they drift. Releases are cut by hand; see [CONTRIBUTING.md](./CONTRIBUTING.md).
 
-## [Unreleased]
+## [1.0.0-preview.1] - 2026-09-30
+
+The first public preview. One `tsbouncer` package holding kernel and ports,
+seven adapter plugins, a testkit checking both conformance suites, and a docs
+site. Preview versions chain as `1.0.0-preview.N`; the API is not settled.
 
 ### Added
 
@@ -18,21 +22,6 @@ build if they drift. Releases are cut by hand; see [CONTRIBUTING.md](./CONTRIBUT
   allow. `cacheConformance` in testkit mirrors `storeConformance`.
 - `@tsbouncer/in-memory` and `@tsbouncer/redis` implement both ports
   (`memoryCache`, `redisCache` with server-side TTL).
-
-### Changed
-
-- Backends moved out of the root package into adapter packages —
-  `@tsbouncer/in-memory`, `@tsbouncer/json-file`, `@tsbouncer/defaults` — so
-  `tsbouncer` is kernel and ports only. Import paths change accordingly
-  (`tsbouncer/memory` is now `@tsbouncer/in-memory`, and so on).
-
-## [1.0.0-preview.1] - 2026-09-29
-
-The first public preview. One `tsbouncer` package, three store plugins, and a
-docs site — all staged, none published yet. Preview versions chain as
-`1.0.0-preview.N`; the API is not settled.
-
-### Added
 
 - `truncated` on `Decision` and `ExplainResult`: a budget that runs out denies,
   and now says so on every answer shape instead of only the list queries.
