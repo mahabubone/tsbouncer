@@ -4,6 +4,10 @@ import type {
   AuthorizationErrorCode,
   AuthorizationErrorOptions,
   Authz,
+  Cache,
+  CacheCapabilities,
+  CachedAuthzOptions,
+  CacheOptions,
   CheckOptions,
   CheckRequest,
   Child,
@@ -93,6 +97,10 @@ type ExportedTypes = {
   AuthorizationErrorCode: AuthorizationErrorCode;
   AuthorizationErrorOptions: AuthorizationErrorOptions;
   Authz: Authz;
+  Cache: Cache;
+  CacheCapabilities: CacheCapabilities;
+  CachedAuthzOptions: CachedAuthzOptions;
+  CacheOptions: CacheOptions;
   CheckOptions: CheckOptions;
   CheckRequest: CheckRequest;
   Child: Child;
@@ -205,6 +213,17 @@ describe('public API surface', () => {
 
   it('exports the introspection helpers', () => {
     for (const name of ['typeNames', 'relationsOf', 'permissionsOf'] as const) {
+      expect(api[name], name).toBeDefined();
+    }
+  });
+
+  it('exports the cache port and the memo layer', () => {
+    for (const name of [
+      'withCache',
+      'canonicalJson',
+      'assertCacheSet',
+      'CacheError',
+    ] as const) {
       expect(api[name], name).toBeDefined();
     }
   });

@@ -165,7 +165,7 @@ const { allOfTypes, members, excluded } = await authz.listSubjects({
 
 ```ts
 import { defineModel, defineType, permission, relation } from 'tsbouncer';
-import { createDefaultAuthz } from 'tsbouncer/defaults';
+import { createDefaultAuthz } from '@tsbouncer/defaults';
 
 const authz = createDefaultAuthz({ model });        // in-memory
 // or: createDefaultAuthz({ model, file: './tsbouncer.json' })
@@ -174,26 +174,24 @@ await authz.grant({ subject: 'user:alice', relation: 'owner', resource: 'documen
 await authz.can('user:alice', 'document.read', 'document:123'); // true
 ```
 
-`tsbouncer` is one package with subpath entries: the root is the kernel with
-zero dependencies, `tsbouncer/memory` and `tsbouncer/json` hold the two stores
-that need nothing external, and `tsbouncer/defaults` picks one for you. If you
-already have Kysely, Drizzle, or Prisma, import the kernel from `tsbouncer` and
-the matching store — this package deliberately depends on no ORM, and neither
-should your install graph because you read a README.
+`tsbouncer` is the kernel and two ports — `TupleStore` for the durable record
+of grants, `Cache` for the fast losable layer in front of repeated questions.
+Backends are separate plugin packages, one per port they implement:
 
-Because the contract is that small, it also runs on JSON on disk, or on a SQL database
-through whichever query builder you already use:
-
-| package | takes | tested against |
+| package | implements | takes |
 | --- | --- | --- |
-| `tsbouncer/memory` | nothing — process-local | in-process |
-| `tsbouncer/json` | a file path | on disk, atomic |
-| `@tsbouncer/kysely` | your `Kysely` instance | SQLite |
-| `@tsbouncer/drizzle` | your `db` and table object | SQLite (sync) and libsql (async) |
-| `@tsbouncer/prisma` | your `PrismaClient` | SQLite via Prisma 7 |
+| `@tsbouncer/in-memory` | store + cache | nothing — process-local |
+| `@tsbouncer/json-file` | store | a file path |
+| `@tsbouncer/redis` | store + cache | your Redis `client` |
+| `@tsbouncer/kysely` | store | your `Kysely` instance |
+| `@tsbouncer/drizzle` | store | your `db` and table object |
+| `@tsbouncer/prisma` | store | your `PrismaClient` |
+| `@tsbouncer/defaults` | neither — it chooses | nothing, or a file path |
 
-Every store is verified by the same conformance suite. A store that does not pass it
-is not finished.
+Every port implementation is verified by the same conformance suite in
+`@tsbouncer/testkit`. An adapter that does not pass is not finished — and a
+community adapter for TypeORM, MikroORM, Sequelize, or Mongoose plugs into the
+same two ports, no kernel changes required.
 
 ## Explain
 

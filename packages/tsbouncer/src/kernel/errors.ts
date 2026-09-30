@@ -4,6 +4,7 @@ export type AuthorizationErrorCode =
   | 'invalid_tuple'
   | 'invalid_store'
   | 'store_error'
+  | 'cache_error'
   | 'access_denied'
   | 'evaluation_limit';
 
@@ -62,6 +63,12 @@ export class StoreError extends AuthorizationError {
 export class InvalidStoreError extends AuthorizationError {
   constructor(message: string, details?: Readonly<Record<string, unknown>>) {
     super('invalid_store', message, { details });
+  }
+}
+
+export class CacheError extends AuthorizationError {
+  constructor(message: string, options: AuthorizationErrorOptions = {}) {
+    super('cache_error', message, options);
   }
 }
 

@@ -127,7 +127,7 @@ list-shaped version of a fail-open bug.
 | | Zanzibar | OpenFGA | `tsbouncer` |
 | --- | --- | --- | --- |
 | Cross-client read-your-writes | ✓ a *zookie* from an earlier read or write bounds how stale a later one may be | per-request `consistency` preference: `MINIMIZE_LATENCY` (default, may use the cache) or `HIGHER_CONSISTENCY` (bypasses it); caching is off by default | none across processes |
-| Within one process | — | — | as fresh as the store handle you pass — with the kernel plus a SQL adapter, `withStore(trx)` reads inside your transaction; the `tsbouncer/memory` and `tsbouncer/json` stores are non-transactional |
+| Within one process | — | — | as fresh as the store handle you pass — with the kernel plus a SQL adapter, `withStore(trx)` reads inside your transaction; the `@tsbouncer/in-memory` and `@tsbouncer/json-file` stores are non-transactional |
 | Where a runaway query is stopped | — | the server | a per-request budget: `maxDepth`, `maxNodes`, `maxDurationMs` |
 | What exhaustion does | — | — | denies; `truncated` is reported on every answer shape — `check()`, `explain()`, and both list queries — so a partial answer is never mistaken for a whole one |
 | Failure when the store is unreachable | — | — | denies — every condition error, missing key, and thrown predicate resolves to not allowed |
@@ -149,7 +149,7 @@ call.
 | License | not published | Apache-2.0 | Apache-2.0 |
 | Governance | Google | CNCF Incubating | none — a repository |
 | Server | the service itself | HTTP and gRPC | none, deliberately |
-| SDKs | — | Go, Java, Node.js, Python, .NET; Go can be embedded | `tsbouncer`, with `tsbouncer/memory`, `tsbouncer/json`, and `tsbouncer/defaults` subpaths; ESM-only, Node 20.11 or newer |
+| SDKs | — | Go, Java, Node.js, Python, .NET; Go can be embedded | `tsbouncer`, with `@tsbouncer/in-memory`, `@tsbouncer/json-file`, and `@tsbouncer/defaults` subpaths; ESM-only, Node 20.11 or newer |
 | CLI / playground | — | both, plus a Terraform provider | none |
 | Storage | Spanner-backed, sharded per namespace, replicated globally | in-memory, PostgreSQL, MySQL, SQLite (beta) | memory, JSON file, Kysely, Drizzle, Prisma — one shared table contract |
 | Telemetry | — | OpenTelemetry traces and metrics | none of its own; `explain()` gives you read counts |
@@ -187,7 +187,7 @@ below it, so if it were wrong the site would not build.
 
 ```ts setup
 import { createAuthz, defineModel, defineType, permission, relation } from 'tsbouncer';
-import { memoryStore } from 'tsbouncer/memory';
+import { memoryStore } from '@tsbouncer/in-memory';
 
 const model = defineModel({
   types: {

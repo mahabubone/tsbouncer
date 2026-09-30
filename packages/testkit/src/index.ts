@@ -386,6 +386,8 @@ export function storeConformance(options: ConformanceOptions): void {
   });
 }
 
+export type { CacheConformanceOptions } from './cache.js';
+export { cacheConformance } from './cache.js';
 export type {
   Clause,
   ClauseResult,

@@ -53,6 +53,7 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
+    "@types/node": "26.6.3",
     "@vitest/coverage-v8": "5.0.2",
     "publint": "0.3.24",
     "tsup": "8.5.1",

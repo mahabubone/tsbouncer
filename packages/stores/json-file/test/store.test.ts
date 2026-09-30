@@ -1,7 +1,7 @@
 import { chmodSync, existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import { afterAll, describe, expect, it } from 'vitest';
-import { jsonStore } from '../../src/json/index.js';
+import { jsonStore } from '../src/index.js';
 import { cleanup, freshStore, tempFile } from './helpers.js';
 
 afterAll(cleanup);

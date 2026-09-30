@@ -20,6 +20,22 @@ Pass a client you already use. The store never connects, disconnects, or
 selects a database — but it connects lazily on first use, so a test that never
 touches the server never dials it either.
 
+The same client serves the caching port:
+
+```ts
+import { redisCache } from '@tsbouncer/redis';
+import { withCache } from 'tsbouncer';
+
+const cached = withCache(authz, redisCache(client, { prefix: 'acme:cache' }), {
+  namespace: 'docs-api-v1',
+  ttlMs: 30_000,
+});
+```
+
+One connection, two ports. The namespace is required and should be versioned
+with the model — two applications sharing one Redis must never read each
+other's decisions.
+
 ## Two roles, one implementation
 
 As the **primary** store it holds the whole access graph durably (Redis

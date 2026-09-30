@@ -1,7 +1,7 @@
-import { jsonStore } from './json/index.js';
-import type { Authz, EvaluationLimits, Model, TupleStore } from './kernel/index.js';
-import { createAuthz } from './kernel/index.js';
-import { memoryStore } from './memory/index.js';
+import { memoryStore } from '@tsbouncer/in-memory';
+import { jsonStore } from '@tsbouncer/json-file';
+import type { Authz, EvaluationLimits, Model, TupleStore } from 'tsbouncer';
+import { createAuthz } from 'tsbouncer';
 
 export interface CreateDefaultAuthzOptions {
   readonly model: Model;

@@ -1,6 +1,6 @@
+import { defineModel, defineType, relation } from 'tsbouncer';
 import { describe, expect, it } from 'vitest';
 import { createDefaultAuthz, isPersistent } from '../src/defaults.js';
-import { defineModel, defineType, relation } from '../src/index.js';
 
 const model = defineModel({
   types: {

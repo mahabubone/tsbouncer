@@ -1,8 +1,8 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { JsonStore } from '../../src/json/index.js';
-import { jsonStore } from '../../src/json/index.js';
+import type { JsonStore } from '../src/index.js';
+import { jsonStore } from '../src/index.js';
 
 const dirs: string[] = [];
 

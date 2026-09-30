@@ -6,13 +6,8 @@ import type {
   TupleStore,
   TupleStoreCapabilities,
   WriteInput,
-} from '../kernel/index.js';
-import {
-  duplicateTupleMessage,
-  matchesQuery,
-  StoreError,
-  tupleKey,
-} from '../kernel/index.js';
+} from 'tsbouncer';
+import { duplicateTupleMessage, matchesQuery, StoreError, tupleKey } from 'tsbouncer';
 
 export interface MemoryStore extends TupleStore {
   /** Every tuple currently held, in insertion order. */

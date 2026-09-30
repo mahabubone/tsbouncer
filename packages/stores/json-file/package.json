@@ -1,0 +1,63 @@
+{
+  "name": "@tsbouncer/json-file",
+  "version": "1.0.0-preview.1",
+  "description": "TupleStore over a single JSON file. Human-readable, git-diffable authorization state for development and small tools.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mahabubone/tsbouncer.git",
+    "directory": "packages/stores/json-file"
+  },
+  "bugs": {
+    "url": "https://github.com/mahabubone/tsbouncer/issues"
+  },
+  "homepage": "https://github.com/mahabubone/tsbouncer/tree/main/packages/stores/json-file#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "keywords": [
+    "authorization",
+    "authz",
+    "store",
+    "json",
+    "esm"
+  ],
+  "scripts": {
+    "prepublishOnly": "pnpm run build",
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "pack:check": "publint --strict && attw --pack . --profile esm-only"
+  },
+  "dependencies": {
+    "tsbouncer": "workspace:*"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "0.18.5",
+    "@tsbouncer/testkit": "workspace:*",
+    "@types/node": "26.6.3",
+    "@vitest/coverage-v8": "5.0.2",
+    "publint": "0.3.24",
+    "tsup": "8.5.1",
+    "typescript": "5.9.3",
+    "vitest": "5.0.2"
+  }
+}

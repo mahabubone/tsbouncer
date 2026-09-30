@@ -2,8 +2,9 @@
 
 **The bouncer for TypeScript/JS ESM-only apps.**
 
-Authorization graph SDK with pluggable storage. The root entry is the kernel and
-nothing else — model, evaluator, queries, and the store contract — so importing
+Authorization graph SDK with pluggable storage. The root entry is the kernel,
+the ports, and nothing else — model, evaluator, queries, the `TupleStore`
+contract, the `Cache` contract, and the `withCache` memo layer — so importing
 it never loads a backend you did not ask for:
 
 ```ts
@@ -20,19 +21,20 @@ const model = defineModel({
 });
 ```
 
-Reach further only on purpose:
+Reach further only on purpose. Backends are separate plugin packages, one per
+port they implement:
 
 ```ts
-import { memoryStore } from 'tsbouncer/memory'; // process-local, for tests
-import { jsonStore } from 'tsbouncer/json'; // a git-diffable file, for tools
-import { createDefaultAuthz } from 'tsbouncer/defaults'; // picks one for you
+import { memoryCache, memoryStore } from '@tsbouncer/in-memory'; // process-local
+import { jsonStore } from '@tsbouncer/json-file'; // a git-diffable file
+import { createDefaultAuthz } from '@tsbouncer/defaults'; // picks one for you
+import { redisStore, redisCache } from '@tsbouncer/redis'; // shared and fast
+import { kyselyStore } from '@tsbouncer/kysely'; // or drizzle, or prisma
 ```
 
-If your app already has Kysely, Drizzle, or Prisma, wire the matching plugin
-package (`@tsbouncer/kysely`, `@tsbouncer/drizzle`, `@tsbouncer/prisma`) and skip
-`tsbouncer`'s stores entirely. `@tsbouncer/testkit` holds the conformance suite
-every store must pass. This package deliberately depends on none of them, and
-neither should your install graph because you read a README.
+`@tsbouncer/testkit` holds the conformance suites every port implementation
+must pass. This package deliberately depends on none of them, and neither
+should your install graph because you read a README.
 
 ## What it is not
 

@@ -56,7 +56,7 @@ process-local, so each test gets a clean graph with no teardown.
 
 ```ts
 import { createAuthz, defineModel, defineType, permission, relation } from 'tsbouncer';
-import { memoryStore } from 'tsbouncer/memory';
+import { memoryStore } from '@tsbouncer/in-memory';
 
 const model = defineModel({
   types: {

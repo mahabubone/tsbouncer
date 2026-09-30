@@ -1,4 +1,12 @@
 export type {
+  Cache,
+  CacheCapabilities,
+  CacheOptions,
+} from './cache.js';
+export { assertCacheSet, canonicalJson } from './cache.js';
+export type { CachedAuthzOptions } from './cached.js';
+export { withCache } from './cached.js';
+export type {
   Authz,
   CheckOptions,
   CheckRequest,
@@ -22,6 +30,7 @@ export type {
 export {
   AccessDeniedError,
   AuthorizationError,
+  CacheError,
   EvaluationLimitError,
   InvalidReferenceError,
   InvalidStoreError,

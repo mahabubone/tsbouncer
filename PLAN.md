@@ -58,21 +58,26 @@ contract they implement is fixed, and every one of them is verified by the same 
 ```
 tsbouncer/
 ├─ packages/
-│  ├─ tsbouncer/       tsbouncer            kernel at `.`, `./memory`, `./json`, `./defaults`
-│  │                                         zero deps and zero node:* imports at the root;
-│  │                                         only `./json` touches fs
-│  ├─ stores/kysely/   @tsbouncer/kysely
-│  ├─ stores/drizzle/  @tsbouncer/drizzle
-│  ├─ stores/prisma/   @tsbouncer/prisma
-│  └─ testkit/         @tsbouncer/testkit   conformance + golden suites
+│  ├─ tsbouncer/       tsbouncer            kernel + ports at `.`, nothing else
+│  │                                         zero deps and zero node:* imports
+│  ├─ stores/in-memory/  @tsbouncer/in-memory   store + cache, zero deps
+│  ├─ stores/json-file/  @tsbouncer/json-file   store over one file
+│  ├─ stores/redis/      @tsbouncer/redis       store + cache over a client
+│  ├─ stores/kysely/     @tsbouncer/kysely      store
+│  ├─ stores/drizzle/    @tsbouncer/drizzle     store
+│  ├─ stores/prisma/     @tsbouncer/prisma      store
+│  ├─ stores/defaults/   @tsbouncer/defaults   chooses in-memory or json-file
+│  └─ testkit/         @tsbouncer/testkit   store + cache conformance, golden suites
 ├─ examples/           hono-rbac · express-drizzle
 └─ pnpm-workspace.yaml
 ```
 
-The single-package shape is Phase 5.5, recorded below. `packages/core` and the
-`memory`/`json` store packages were folded into `tsbouncer` subpaths so an app
-never loads a backend it did not ask for; the SQL adapters stayed separate
-plugin packages with their names unchanged.
+Backends are ports-and-adapters: the kernel declares `TupleStore` and `Cache`,
+and each adapter package implements the ports it can — one package per backend,
+never one package per port, so a dual-purpose backend is one install. The
+port-driven split is recorded below; `withCache` memoizes decisions with
+resource-scoped invalidation, and community adapters (TypeORM, MikroORM,
+Sequelize, Mongoose, …) plug into the same two ports with no kernel changes.
 
 **There is a docs site** (`docs/`, Astro 7 + Tailwind 4, static output). It is
 usage documentation and nothing else: `PLAN.md` remains the design record,
@@ -372,8 +377,24 @@ staged state is marked ready. This phase restructures and stages.
 |---|---|
 | Site | New marketing landing at `/`; all docs under `/docs/*`; current intro becomes `/docs`. Static output, served from GitHub Pages as a **project subpath** (`base: '/tsbouncer/'` under `github.com/mahabubone/tsbouncer`). |
 | Links | Absolute internal links do not survive Astro `base`, so content links go relative, components/layout use `BASE_URL`, and the snippet/link checkers resolve the `/docs/*` routes. |
-| Package | **One `tsbouncer`**: the kernel (today's `@tsbouncer/core`) at `.`, `./memory`, `./json`, `./defaults` (`createDefaultAuthz`); adapters stay separate plugin packages **with current names** (`@tsbouncer/kysely`, …); `@tsbouncer/testkit` stays separate. Root never pulls `fs` — `jsonStore` lives behind `./json` only. |
+| Package | **One `tsbouncer`** (kernel + ports at `.`, backends as plugins; superseded by the ports revamp below, which extracted the `./memory`, `./json`, and `./defaults` subpaths into adapter packages). |
 | Version | Preview chain `1.0.0-preview.N` (`.1`, `.2`, … — plain numeric identifiers, so precedence stays chronological; month names would sort lexically and break it), single version enforced everywhere as today. The `v` prefix lives on git tags only, never in `package.json`. Final is `1.0.0`. |
 | Deploy | Pages deploy automation is deferred with the other pipes; this phase proves the SSG output (`docs:build` under `base`) and documents the manual publish steps. |
 | Build order | `@tsbouncer/testkit` takes the kernel as a **peer** dependency (one kernel per install, never two), so turbo's `^build` does not order it after `tsbouncer#build` — and `tsbouncer` dev-depends on the testkit for its store suites, so a blanket edge would be a cycle. Each side declares its edge explicitly instead: `packages/testkit/turbo.json` orders its tasks after `tsbouncer#build`, and `packages/tsbouncer/turbo.json` narrows `build` to `dependsOn: []` (the kernel build needs nothing). CI caught the missing edge on a clean tree; local builds had masked it with stale `dist/`. |
 | Stores | Focus is InMemory, JSON-file, Redis, SQLite, and PostgreSQL only. **CI stays SQLite-only** — no service containers, ever; `@tsbouncer/redis` and Postgres runs are env-gated local QA (`TSBUNCER_REDIS_URL`, `TSBUNCER_PG_URL`), skipped when unset. **Redis is both roles**: the fast shared store deployments check against hot, and a supported alternate backend — one implementation, Lua-atomic ops over plain index sets, no modules. `watch` stays `false` everywhere until the contract grows a subscription primitive. |
+
+## Ports revamp — adapters implement ports, the kernel declares them
+
+Backends were folded into the root package as subpaths in Phase 5.5, which
+recoupled what the split was for: one package per backend means one install
+per backend, and a community adapter (TypeORM, MikroORM, Sequelize, Mongoose)
+plugs into a port without touching the kernel or the root. So the subpaths
+moved out — `@tsbouncer/in-memory`, `@tsbouncer/json-file`,
+`@tsbouncer/defaults` — and the root is kernel plus ports again.
+
+| # | Decision |
+|---|---|
+| Ports | Two, both declared in the kernel: `TupleStore` (durable record of grants) and `Cache` (fast, losable; JSON-serializable values, `undefined` is the miss signal and never storable, `ttlMs` without `ttl` support rejects). |
+| Adapters | One package per backend, named `@tsbouncer/<backend>`, exposing every port it implements: in-memory and redis do store + cache, the rest do store, `defaults` chooses and implements neither. |
+| Memo layer | `withCache(authz, cache, { namespace, ttlMs? })` memoizes `can`/`check` with resource-scoped invalidation and full-clear fallback. The namespace is required and should be model-versioned — same keys under different models would answer from the wrong graph. A failed invalidation disables caching rather than risking a stale allow; `withStore` drops the layer, because transactional reads must never hit shared cache. `explain`, `expand`, and the lists stay uncached. |
+| Conformance | `cacheConformance` in testkit mirrors `storeConformance` in shape and narrowness, including capability-gated TTL tests. An adapter that does not pass is not finished — same rule, both ports. |

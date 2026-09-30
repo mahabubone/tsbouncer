@@ -1,6 +1,6 @@
 import { assertGolden, runGolden } from '@tsbouncer/testkit';
 import { expect, it } from 'vitest';
-import { memoryStore } from '../../src/memory/index.js';
+import { memoryStore } from '../src/index.js';
 
 /**
  * `memoryStore` is the reference implementation for the golden dataset: it has

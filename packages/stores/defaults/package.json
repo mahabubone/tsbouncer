@@ -1,0 +1,62 @@
+{
+  "name": "@tsbouncer/defaults",
+  "version": "1.0.0-preview.1",
+  "description": "One-call client setup: an in-memory store, or a JSON file when given a path.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mahabubone/tsbouncer.git",
+    "directory": "packages/stores/defaults"
+  },
+  "bugs": {
+    "url": "https://github.com/mahabubone/tsbouncer/issues"
+  },
+  "homepage": "https://github.com/mahabubone/tsbouncer/tree/main/packages/stores/defaults#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "keywords": [
+    "authorization",
+    "authz",
+    "esm"
+  ],
+  "scripts": {
+    "prepublishOnly": "pnpm run build",
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "pack:check": "publint --strict && attw --pack . --profile esm-only"
+  },
+  "dependencies": {
+    "@tsbouncer/in-memory": "workspace:*",
+    "@tsbouncer/json-file": "workspace:*",
+    "tsbouncer": "workspace:*"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "0.18.5",
+    "@vitest/coverage-v8": "5.0.2",
+    "@types/node": "26.6.3",
+    "publint": "0.3.24",
+    "tsup": "8.5.1",
+    "typescript": "5.9.3",
+    "vitest": "5.0.2"
+  }
+}

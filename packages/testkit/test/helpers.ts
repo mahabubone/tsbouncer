@@ -1,4 +1,6 @@
 import {
+  assertCacheSet,
+  type Cache,
   type DeleteInput,
   matchesQuery,
   NO_CAPABILITIES,
@@ -101,4 +103,53 @@ export function conditionStrippingStore(): TupleStore {
       void input;
     },
   });
+}
+
+/**
+ * A minimal, honest cache: a map, an expiry timestamp, and the shared
+ * validation. This exists so `cacheConformance` is executed by the package
+ * that ships it, against a reference whose behaviour is obvious by
+ * inspection — the same reason `arrayStore` exists for the store suite.
+ */
+export function objectCache(
+  entries: readonly (readonly [string, unknown])[] = [],
+): Cache {
+  const held = new Map<string, { value: unknown; expiresAt?: number }>();
+  for (const [key, value] of entries) {
+    assertCacheSet(key, value, undefined, true);
+    held.set(key, { value: structuredClone(value) });
+  }
+  const live = (key: string): unknown => {
+    const entry = held.get(key);
+    if (entry === undefined) return undefined;
+    if (entry.expiresAt !== undefined && Date.now() >= entry.expiresAt) {
+      held.delete(key);
+      return undefined;
+    }
+    return structuredClone(entry.value);
+  };
+  return {
+    capabilities: { persistent: false, ttl: true },
+    async get(key: string): Promise<unknown> {
+      return live(key);
+    },
+    async set(key: string, value: unknown, options?: { ttlMs?: number }): Promise<void> {
+      const ttlMs = options?.ttlMs;
+      assertCacheSet(key, value, ttlMs, true);
+      held.set(
+        key,
+        ttlMs === undefined
+          ? { value: structuredClone(value) }
+          : { value: structuredClone(value), expiresAt: Date.now() + ttlMs },
+      );
+    },
+    async delete(key: string): Promise<void> {
+      held.delete(key);
+    },
+    async clear(prefix: string): Promise<void> {
+      for (const key of [...held.keys()]) {
+        if (key.startsWith(prefix)) held.delete(key);
+      }
+    },
+  };
 }

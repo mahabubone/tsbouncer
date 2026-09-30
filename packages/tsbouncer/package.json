@@ -1,7 +1,7 @@
 {
   "name": "tsbouncer",
   "version": "1.0.0-preview.1",
-  "description": "Authorization graph SDK for TypeScript ESM apps. Lean kernel at the root, memory and JSON stores behind subpaths, SQL adapters as plugins.",
+  "description": "Authorization graph SDK for TypeScript ESM apps. Kernel and ports at the root; stores and caches are separate adapter packages.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -24,18 +24,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    },
-    "./memory": {
-      "types": "./dist/memory.d.ts",
-      "import": "./dist/memory.js"
-    },
-    "./json": {
-      "types": "./dist/json.d.ts",
-      "import": "./dist/json.js"
-    },
-    "./defaults": {
-      "types": "./dist/defaults.d.ts",
-      "import": "./dist/defaults.js"
     },
     "./package.json": "./package.json"
   },

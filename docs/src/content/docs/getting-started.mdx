@@ -15,8 +15,8 @@ npm i @tsbouncer/kysely            # or drizzle / prisma, over your own client
 ```
 
 `tsbouncer` is one package with subpath entries: the root is the kernel with
-zero dependencies, `tsbouncer/memory` and `tsbouncer/json` hold the two stores
-that need nothing external, and `tsbouncer/defaults` picks one for you. If you
+zero dependencies, `@tsbouncer/in-memory` and `@tsbouncer/json-file` hold the two stores
+that need nothing external, and `@tsbouncer/defaults` picks one for you. If you
 already have Kysely, Drizzle, or Prisma, import the kernel from `tsbouncer` and
 the matching store — this package deliberately depends on no ORM, and neither
 should your install graph because you read a README.
@@ -54,7 +54,7 @@ const model = defineModel({
 
 ```ts
 import { createAuthz } from 'tsbouncer';
-import { memoryStore } from 'tsbouncer/memory';
+import { memoryStore } from '@tsbouncer/in-memory';
 
 const authz = createAuthz({ model, store: memoryStore() });
 ```

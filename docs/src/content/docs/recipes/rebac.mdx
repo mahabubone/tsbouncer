@@ -18,7 +18,7 @@ application code is how a permission system becomes unexplainable.
 
 ```ts setup
 import { createAuthz, defineModel, defineType, permission, relation, ttu } from 'tsbouncer';
-import { memoryStore } from 'tsbouncer/memory';
+import { memoryStore } from '@tsbouncer/in-memory';
 
 const model = defineModel({
   types: {

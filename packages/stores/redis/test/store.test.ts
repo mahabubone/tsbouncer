@@ -216,9 +216,41 @@ describe('without a server', () => {
     const tuple = { subject: 'user:alice', relation: 'viewer', resource: 'document:1' };
     const store = redisStore(scriptedClient([1, 1, 1, 1]));
     await store.write({ tuples: [tuple] });
+    await store.write({ tuples: [tuple], mode: 'upsert' });
     await store.delete({ kind: 'tuples', tuples: [tuple] });
     await store.delete({ kind: 'filter', query: { relation: 'viewer' } });
     await store.delete({ kind: 'replace', query: {}, tuples: [tuple] });
+  });
+
+  it('reads a page through a scripted reply', async () => {
+    const doc = JSON.stringify({
+      subject: 'user:alice',
+      relation: 'viewer',
+      resource: 'document:1',
+    });
+    const store = redisStore(scriptedClient([[3, doc]]));
+    const page = await store.read({ limit: 2 });
+    expect(page.items).toHaveLength(1);
+    expect(page.cursor).toBe('1');
+  });
+
+  it('connects lazily when closed', async () => {
+    let connected = false;
+    const fake = {
+      isOpen: false,
+      async connect() {
+        connected = true;
+        (this as { isOpen: boolean }).isOpen = true;
+      },
+      destroy() {},
+      async eval(): Promise<unknown> {
+        return [0];
+      },
+    } as unknown as RedisClientType;
+    const store = redisStore(fake);
+    const page = await store.read({});
+    expect(page.items).toEqual([]);
+    expect(connected).toBe(true);
   });
 
   it('wraps an unreachable server in StoreError on every operation', async () => {

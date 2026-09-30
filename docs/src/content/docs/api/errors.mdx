@@ -10,7 +10,7 @@ import Callout from '~/components/Callout.astro';
 
 ```ts setup
 import { createAuthz, defineModel, defineType, permission, relation } from 'tsbouncer';
-import { memoryStore } from 'tsbouncer/memory';
+import { memoryStore } from '@tsbouncer/in-memory';
 import type { Authz, CheckRequest } from 'tsbouncer';
 
 const model = defineModel({

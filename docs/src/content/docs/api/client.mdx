@@ -13,7 +13,7 @@ example on this page runs against this setup:
 
 ```ts setup
 import { createAuthz, defineModel, defineType, isAuthorizationError, permission, relation } from 'tsbouncer';
-import { memoryStore } from 'tsbouncer/memory';
+import { memoryStore } from '@tsbouncer/in-memory';
 import type { EvaluationLimits, Model, TupleStore } from 'tsbouncer';
 
 const model = defineModel({
@@ -209,11 +209,39 @@ the outer store and returned as if they came from the transaction.
 ```ts
 declare function inTransaction<T>(fn: (store: TupleStore) => Promise<T>): Promise<T>;
 
-await inTransaction(async (trx) => {
-  const scoped = authz.withStore(trx);
+await inTransaction(async (store) => {
+  const scoped = authz.withStore(store);
   await scoped.grant({ subject: 'user:alice', relation: 'owner', resource: 'document:1' });
   // decisions made here see the write above, and nothing outside the transaction
 });
+```
+
+## Memoizing decisions
+
+```ts ts-skip
+withCache(authz: Authz, cache: Cache, options: CachedAuthzOptions): Authz
+```
+
+Wraps a client so `can` and `check` consult a `Cache` first. Hits serve
+validated values only; misses, corrupt entries, and backend failures all fall
+through to evaluation. Every mutation invalidates by resource — a scope without
+one concrete resource clears the whole namespace instead of guessing — and a
+failed invalidation disables caching rather than risking a stale allow.
+`explain`, `expand`, and the list queries stay uncached, and `withStore` drops
+the layer, because transactional reads must never hit shared cache.
+
+The namespace is required and should be versioned with the model. Two
+applications sharing one cache must never read each other's decisions:
+
+```ts
+import { withCache } from 'tsbouncer';
+import { memoryCache } from '@tsbouncer/in-memory';
+
+const cached = withCache(authz, memoryCache(), { namespace: 'docs-api-v1' });
+
+await authz.grant({ subject: 'user:alice', relation: 'owner', resource: 'document:1' });
+await cached.can('user:alice', 'document.read', 'document:1'); // true, evaluated once
+await cached.can('user:alice', 'document.read', 'document:1'); // true, from the memo
 ```
 
 ## Introspection

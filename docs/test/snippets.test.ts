@@ -44,10 +44,13 @@ const CONTENT = join(here, '..', 'src', 'content', 'docs');
 const TSC = join(here, '..', 'node_modules', 'typescript', 'bin', 'tsc');
 const DIST = join(here, '..', '..', 'packages', 'tsbouncer', 'dist');
 const TSBOUNCER = join(DIST, 'index.d.ts');
-// Every published subpath ships its own declarations. Snippets import
-// `tsbouncer/memory` and friends, so a dist with only the root entry would
-// compile the wrong thing — or nothing — while this assertion stayed green.
-const SUBPATHS = ['memory.d.ts', 'json.d.ts', 'defaults.d.ts'].map((f) => join(DIST, f));
+// Every adapter package ships its own declarations. Snippets import
+// `@tsbouncer/in-memory` and friends, so a workspace that was never built
+// would compile the wrong thing — or nothing — while this assertion stayed
+// green.
+const ADAPTERS = ['in-memory', 'json-file', 'defaults'].map((name) =>
+  join(here, '..', '..', 'packages', 'stores', name, 'dist', 'index.d.ts'),
+);
 
 type Shape = 'statement' | 'fragment' | 'declaration' | 'signature';
 
@@ -202,7 +205,7 @@ describe('documentation snippets', () => {
     expect(exists(TSBOUNCER), `${TSBOUNCER} is missing — build the workspace first`).toBe(
       true,
     );
-    for (const entry of SUBPATHS) {
+    for (const entry of ADAPTERS) {
       expect(exists(entry), `${entry} is missing — build the workspace first`).toBe(true);
     }
 

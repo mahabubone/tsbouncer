@@ -12,6 +12,7 @@ import Callout from '~/components/Callout.astro';
 import { createAuthz } from 'tsbouncer';
 import { kyselyStore } from '@tsbouncer/kysely';
 import type {
+  Cache,
   DeleteInput,
   Page,
   ReadTupleQuery,
@@ -20,7 +21,7 @@ import type {
   WriteInput,
 } from 'tsbouncer';
 import type { Kysely } from 'kysely';
-import { storeConformance } from '@tsbouncer/testkit';
+import { cacheConformance, storeConformance } from '@tsbouncer/testkit';
 
 declare const db: Kysely<unknown>;
 ```
@@ -42,6 +43,46 @@ void contract;
 
 Stores move tuples. They do not evaluate conditions, resolve permissions, or
 decide anything.
+
+## The two ports
+
+Backends implement ports, and there are exactly two of them. `TupleStore` is
+the durable record of grants — the contract above. `Cache` is the fast,
+losable layer in front of repeated questions:
+
+```ts ts-skip
+interface Cache {
+  readonly capabilities: { persistent: boolean; ttl: boolean };
+  get(key: string): Promise<unknown>; // undefined on a miss
+  set(key: string, value: unknown, options?: { ttlMs?: number }): Promise<void>;
+  delete(key: string): Promise<void>;
+  clear(prefix: string): Promise<void>; // every key starting with prefix
+}
+// Shape sketch — the contract lives in `tsbouncer`, asserted by conformance.
+```
+
+Anything in a cache may vanish at any time without violating the contract;
+that is the whole difference between the ports, and the reason one backend can
+implement both. Values must be JSON-serializable — a value written through one
+adapter has to be readable through another — and `undefined` is never storable,
+because it is the miss signal. A `ttlMs` on a backend without `ttl` support is
+rejected rather than silently ignored: an expiry that does not happen is a
+staleness bug wearing a success mask.
+
+`withCache(authz, cache, { namespace })` memoizes `can` and `check` through any
+`Cache`, invalidating by resource on every write. The namespace is required and
+should be versioned with the model — two applications sharing one cache must
+never read each other's decisions. `explain`, `expand`, and the list queries
+stay uncached; `withStore` drops the layer, because transactional reads must
+never hit a cache shared with committed state.
+
+| package | implements |
+| --- | --- |
+| `@tsbouncer/in-memory` | `TupleStore` (`memoryStore`) and `Cache` (`memoryCache`) |
+| `@tsbouncer/json-file` | `TupleStore` (`jsonStore`) |
+| `@tsbouncer/kysely`, `@tsbouncer/drizzle`, `@tsbouncer/prisma` | `TupleStore` |
+| `@tsbouncer/redis` | `TupleStore` (`redisStore`) and `Cache` (`redisCache`) |
+| `@tsbouncer/defaults` | neither — it chooses: in-memory, or a JSON file when given a path |
 
 <Callout type="caution" title="There is deliberately no optional check() fast path">
 An earlier design let each store implement a `check()` shortcut. It was rejected:
@@ -71,8 +112,8 @@ suite is written to catch exactly that.
 
 | package | takes | tested against |
 | --- | --- | --- |
-| `tsbouncer/memory` | nothing — process-local | in-process |
-| `tsbouncer/json` | a file path | on disk, atomic |
+| `@tsbouncer/in-memory` | nothing — process-local | in-process |
+| `@tsbouncer/json-file` | a file path | on disk, atomic |
 | `@tsbouncer/kysely` | your `Kysely` instance | SQLite in CI, PostgreSQL locally |
 | `@tsbouncer/drizzle` | your `db` and table object | SQLite (sync) and libsql (async) |
 | `@tsbouncer/prisma` | your `PrismaClient` | SQLite via Prisma 7 |
@@ -166,20 +207,29 @@ call `can()` per row.
 
 ## Writing your own
 
-Implement three methods and declare your capabilities. Then run the conformance
-suite from `@tsbouncer/testkit`:
+Implement a port — three methods and declared capabilities for a store, four
+for a cache — then run the matching conformance suite from
+`@tsbouncer/testkit`. One package per backend, named `@tsbouncer/<backend>`,
+exposing every port it implements:
 
 ```ts
 declare function myStore(): TupleStore;
+declare function myCache(): Cache;
 
 storeConformance({
   name: 'my-store',
   skip: ['pagination'],
   create: () => myStore(),
 });
+
+cacheConformance({
+  name: 'my-cache',
+  create: () => myCache(),
+});
 ```
 
-A store that does not pass is not done. See [Testing](../recipes/testing).
+A store that does not pass is not done, and the same holds for a cache. See
+[Testing](../recipes/testing).
 
 ## Next
 

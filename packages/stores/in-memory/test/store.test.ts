@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { memoryStore } from '../../src/memory/index.js';
+import { memoryStore } from '../src/index.js';
 
 const TUPLE = {
   subject: 'user:alice',

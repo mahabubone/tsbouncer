@@ -33,7 +33,7 @@ evaluates anything.
 
 ```ts setup
 import { createAuthz, defineCondition, defineModel, defineType, formatExplain, permission, relation } from 'tsbouncer';
-import { memoryStore } from 'tsbouncer/memory';
+import { memoryStore } from '@tsbouncer/in-memory';
 
 const model = defineModel({
   types: {
