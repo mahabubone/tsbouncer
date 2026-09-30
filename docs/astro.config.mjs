@@ -1,7 +1,10 @@
 import mdx from '@astrojs/mdx';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'astro/config';
+import { absoluteLinks } from './src/plugins/absolute-links.mjs';
 import { codeChrome } from './src/plugins/code-chrome.mjs';
+
+const base = '/tsbouncer/';
 
 // Static output on purpose: the whole site is markdown and a build step, so there
 // is nothing to run and nothing to keep patched.
@@ -11,13 +14,24 @@ export default defineConfig({
   // /tsbouncer/, so every internal link must be relative or BASE_URL-aware —
   // Astro does not rewrite absolute `/…` links under `base`. Canonicals still
   // assume the custom domain; revisit them if Pages stays subpath-only.
-  base: '/tsbouncer/',
+  base,
   output: 'static',
   trailingSlash: 'never',
   // MDX rather than markdown alone, so a page can import a component — a callout
   // for a warning, a table for a reference.
   integrations: [mdx()],
   markdown: {
+    // Relative content links are rewritten to absolute site paths so they
+    // resolve identically with or without a trailing slash in the URL.
+    remarkPlugins: [
+      [
+        absoluteLinks,
+        {
+          base,
+          contentDir: new URL('./src/content/docs/', import.meta.url).pathname,
+        },
+      ],
+    ],
     // Both themes are emitted as CSS variables and `.dark` picks between them, so
     // a code block is legible in either mode and there is no flash on toggle.
     shikiConfig: {
