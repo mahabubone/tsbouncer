@@ -1,4 +1,4 @@
-import type { Cache } from 'tsbouncer';
+import type { Cache } from '@tsbouncer/tsbouncer';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 export interface CacheConformanceOptions {

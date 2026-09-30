@@ -1,4 +1,3 @@
-import { and, eq, or, sql } from 'drizzle-orm';
 import type {
   DeleteInput,
   Page,
@@ -7,8 +6,9 @@ import type {
   TupleStore,
   TupleStoreCapabilities,
   WriteInput,
-} from 'tsbouncer';
-import { formatRef, parseRef, StoreError } from 'tsbouncer';
+} from '@tsbouncer/tsbouncer';
+import { formatRef, parseRef, StoreError } from '@tsbouncer/tsbouncer';
+import { and, eq, or, sql } from 'drizzle-orm';
 import { type AnyTsbouncerTable, NULL_ABSENT, type TupleRow } from './schema.js';
 
 export type { AnyTsbouncerTable, TupleRow } from './schema.js';

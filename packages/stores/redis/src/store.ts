@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import type { RedisClientType } from 'redis';
 import type {
   DeleteInput,
   FilterValue,
@@ -9,8 +8,9 @@ import type {
   TupleStore,
   TupleStoreCapabilities,
   WriteInput,
-} from 'tsbouncer';
-import { duplicateTupleMessage, StoreError, tupleKey } from 'tsbouncer';
+} from '@tsbouncer/tsbouncer';
+import { duplicateTupleMessage, StoreError, tupleKey } from '@tsbouncer/tsbouncer';
+import type { RedisClientType } from 'redis';
 
 /**
  * How tuples live in Redis. Plain commands only — no modules, no RediSearch —

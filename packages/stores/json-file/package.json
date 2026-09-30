@@ -48,7 +48,7 @@
     "pack:check": "publint --strict && attw --pack . --profile esm-only"
   },
   "dependencies": {
-    "tsbouncer": "workspace:*"
+    "@tsbouncer/tsbouncer": "workspace:*"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",

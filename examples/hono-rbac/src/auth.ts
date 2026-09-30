@@ -1,5 +1,5 @@
+import type { Authz, ModelShapeOf, PermissionOf } from '@tsbouncer/tsbouncer';
 import type { Context, MiddlewareHandler } from 'hono';
-import type { Authz, ModelShapeOf, PermissionOf } from 'tsbouncer';
 import { HttpError } from './http.js';
 import type { model } from './model.js';
 

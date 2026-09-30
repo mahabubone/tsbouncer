@@ -8,7 +8,7 @@ contract, the `Cache` contract, and the `withCache` memo layer — so importing
 it never loads a backend you did not ask for:
 
 ```ts
-import { createAuthz, defineModel, defineType, permission, relation } from 'tsbouncer';
+import { createAuthz, defineModel, defineType, permission, relation } from '@tsbouncer/tsbouncer';
 
 const model = defineModel({
   types: {
@@ -47,7 +47,7 @@ README.
 ## Install
 
 ```bash
-npm i tsbouncer
+npm i @tsbouncer/tsbouncer
 ```
 
 ## Requirements

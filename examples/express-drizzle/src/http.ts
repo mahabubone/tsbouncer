@@ -1,6 +1,6 @@
+import type { Authz, ModelShapeOf, PermissionOf } from '@tsbouncer/tsbouncer';
 import { eq } from 'drizzle-orm';
 import type { NextFunction, Request, Response } from 'express';
-import type { Authz, ModelShapeOf, PermissionOf } from 'tsbouncer';
 import type { Db } from './db/index.js';
 import { organizations, users } from './db/schema.js';
 import type { model } from './model.js';

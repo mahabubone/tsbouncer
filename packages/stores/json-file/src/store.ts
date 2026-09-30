@@ -9,8 +9,13 @@ import type {
   TupleStore,
   TupleStoreCapabilities,
   WriteInput,
-} from 'tsbouncer';
-import { duplicateTupleMessage, matchesQuery, StoreError, tupleKey } from 'tsbouncer';
+} from '@tsbouncer/tsbouncer';
+import {
+  duplicateTupleMessage,
+  matchesQuery,
+  StoreError,
+  tupleKey,
+} from '@tsbouncer/tsbouncer';
 import { FORMAT_VERSION } from './format.js';
 
 export type { Document } from './format.js';

@@ -15,7 +15,7 @@
     "better-sqlite3": "13.0.3",
     "drizzle-orm": "0.45.3",
     "express": "5.2.1",
-    "tsbouncer": "workspace:*"
+    "@tsbouncer/tsbouncer": "workspace:*"
   },
   "devDependencies": {
     "@types/better-sqlite3": "7.6.13",

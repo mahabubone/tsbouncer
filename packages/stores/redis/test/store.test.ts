@@ -1,5 +1,5 @@
+import { StoreError } from '@tsbouncer/tsbouncer';
 import { createClient, type RedisClientType } from 'redis';
-import { StoreError } from 'tsbouncer';
 import { describe, expect, it } from 'vitest';
 import { redisStore } from '../src/index.js';
 import { REDIS_URL } from './db.js';

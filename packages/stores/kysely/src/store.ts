@@ -1,5 +1,3 @@
-import type { Kysely } from 'kysely';
-import { sql } from 'kysely';
 import type {
   DeleteInput,
   Page,
@@ -8,8 +6,10 @@ import type {
   TupleStore,
   TupleStoreCapabilities,
   WriteInput,
-} from 'tsbouncer';
-import { formatRef, parseRef, StoreError } from 'tsbouncer';
+} from '@tsbouncer/tsbouncer';
+import { formatRef, parseRef, StoreError } from '@tsbouncer/tsbouncer';
+import type { Kysely } from 'kysely';
+import { sql } from 'kysely';
 import { COLUMNS, KEY_COLUMNS, NULL_ABSENT, TABLE, type TupleRow } from './schema.js';
 
 export type { Dialect } from './schema.js';

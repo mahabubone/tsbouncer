@@ -48,7 +48,7 @@
   "dependencies": {
     "@tsbouncer/in-memory": "workspace:*",
     "@tsbouncer/json-file": "workspace:*",
-    "tsbouncer": "workspace:*"
+    "@tsbouncer/tsbouncer": "workspace:*"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",

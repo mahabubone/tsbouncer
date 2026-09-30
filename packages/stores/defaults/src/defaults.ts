@@ -1,7 +1,7 @@
 import { memoryStore } from '@tsbouncer/in-memory';
 import { jsonStore } from '@tsbouncer/json-file';
-import type { Authz, EvaluationLimits, Model, TupleStore } from 'tsbouncer';
-import { createAuthz } from 'tsbouncer';
+import type { Authz, EvaluationLimits, Model, TupleStore } from '@tsbouncer/tsbouncer';
+import { createAuthz } from '@tsbouncer/tsbouncer';
 
 export interface CreateDefaultAuthzOptions {
   readonly model: Model;

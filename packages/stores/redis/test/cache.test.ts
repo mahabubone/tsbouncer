@@ -1,5 +1,5 @@
+import { CacheError } from '@tsbouncer/tsbouncer';
 import type { RedisClientType } from 'redis';
-import { CacheError } from 'tsbouncer';
 import { describe, expect, it } from 'vitest';
 import { redisCache } from '../src/index.js';
 

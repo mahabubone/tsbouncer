@@ -1,4 +1,4 @@
-import type { Tuple } from 'tsbouncer';
+import type { Tuple } from '@tsbouncer/tsbouncer';
 
 /**
  * The seed.

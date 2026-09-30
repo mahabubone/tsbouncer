@@ -13,7 +13,7 @@ code, and it is validated at `defineModel` time. Relations are where tuples may 
 written; permissions are what you ask about.
 
 ```ts setup
-import { createAuthz, defineCondition, defineModel, defineType, permission, relation, ttu, wildcard } from 'tsbouncer';
+import { createAuthz, defineCondition, defineModel, defineType, permission, relation, ttu, wildcard } from '@tsbouncer/tsbouncer';
 import { memoryStore } from '@tsbouncer/in-memory';
 
 const model = defineModel({

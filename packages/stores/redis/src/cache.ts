@@ -1,6 +1,6 @@
+import type { Cache, CacheCapabilities, CacheOptions } from '@tsbouncer/tsbouncer';
+import { assertCacheSet, CacheError } from '@tsbouncer/tsbouncer';
 import type { RedisClientType } from 'redis';
-import type { Cache, CacheCapabilities, CacheOptions } from 'tsbouncer';
-import { assertCacheSet, CacheError } from 'tsbouncer';
 
 export interface RedisCacheOptions {
   /** Key namespace. Defaults to `tsbouncer`. Isolate tests with a uuid. */

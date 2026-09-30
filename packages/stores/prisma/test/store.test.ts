@@ -1,4 +1,4 @@
-import type { Tuple } from 'tsbouncer';
+import type { Tuple } from '@tsbouncer/tsbouncer';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { KEY_FIELDS, MODEL_DDL, prismaStore, rowToTuple } from '../src/index.js';
 import { createDb, ensureTable, type Handle, truncate } from './db.js';

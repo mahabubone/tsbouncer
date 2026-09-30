@@ -1,5 +1,5 @@
-import type { Cache, CacheCapabilities, CacheOptions } from 'tsbouncer';
-import { assertCacheSet } from 'tsbouncer';
+import type { Cache, CacheCapabilities, CacheOptions } from '@tsbouncer/tsbouncer';
+import { assertCacheSet } from '@tsbouncer/tsbouncer';
 
 export interface MemoryCacheOptions {
   /** Seed entries. Keys must be non-empty, values must not be `undefined`. */

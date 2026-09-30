@@ -16,7 +16,7 @@ These are decided. Do not relitigate them in PRs; change `PLAN.md` deliberately 
    named exports only, `verbatimModuleSyntax`. Node `>=22`.
 2. **No framework tooling.** No Express/Hono/Fastify/Nest middleware, no HTTP layer,
    no auth, no sessions, no JWT/OAuth. Ever. The app owns all of it.
-3. **The `tsbouncer` root entry has zero dependencies and zero `node:*` imports.**
+3. **The `@tsbouncer/tsbouncer` root entry has zero dependencies and zero `node:*` imports.**
    Only `@tsbouncer/json-file` may touch `fs`. Backends are separate adapter
    packages, one per port they implement — never add a backend to the root.
 4. **Filtered reads are the only mandatory store primitive.** Do not add an optional
@@ -34,7 +34,7 @@ These are decided. Do not relitigate them in PRs; change `PLAN.md` deliberately 
 ## Layout
 
 ```
-packages/tsbouncer            tsbouncer            kernel + ports at `.`, nothing else
+packages/tsbouncer            @tsbouncer/tsbouncer      kernel + ports at `.`, nothing else
 packages/stores/in-memory    @tsbouncer/in-memory    store + cache
 packages/stores/json-file     @tsbouncer/json-file     store over one file
 packages/stores/redis         @tsbouncer/redis         store + cache

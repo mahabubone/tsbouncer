@@ -24,7 +24,7 @@ The same client serves the caching port:
 
 ```ts
 import { redisCache } from '@tsbouncer/redis';
-import { withCache } from 'tsbouncer';
+import { withCache } from '@tsbouncer/tsbouncer';
 
 const cached = withCache(authz, redisCache(client, { prefix: 'acme:cache' }), {
   namespace: 'docs-api-v1',

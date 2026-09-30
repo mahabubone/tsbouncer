@@ -14,7 +14,7 @@
     "@hono/node-server": "2.1.3",
     "@tsbouncer/json-file": "workspace:*",
     "hono": "4.13.11",
-    "tsbouncer": "workspace:*"
+    "@tsbouncer/tsbouncer": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "26.6.3",

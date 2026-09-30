@@ -1,4 +1,4 @@
-import { defineModel, defineType, relation } from 'tsbouncer';
+import { defineModel, defineType, relation } from '@tsbouncer/tsbouncer';
 import { describe, expect, it } from 'vitest';
 import { createDefaultAuthz, isPersistent } from '../src/defaults.js';
 

@@ -48,7 +48,7 @@
     "pack:check": "publint --strict && attw --pack . --profile esm-only"
   },
   "peerDependencies": {
-    "tsbouncer": "workspace:*",
+    "@tsbouncer/tsbouncer": "workspace:*",
     "vitest": ">=5.0 <6"
   },
   "devDependencies": {

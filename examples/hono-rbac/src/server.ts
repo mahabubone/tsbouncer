@@ -1,7 +1,7 @@
 import type { AddressInfo } from 'node:net';
 import { serve } from '@hono/node-server';
 import { jsonStore } from '@tsbouncer/json-file';
-import { type Authz, createAuthz } from 'tsbouncer';
+import { type Authz, createAuthz } from '@tsbouncer/tsbouncer';
 import { createApp } from './app.js';
 import { seed } from './data.js';
 import { model } from './model.js';

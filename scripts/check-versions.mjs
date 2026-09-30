@@ -50,9 +50,9 @@ for (const dir of packageDirs()) {
   // A jsr.json that disagrees with package.json ships a different version to a
   // different registry under the same release. Every scoped package carries
   // one, so a missing or drifting file fails here rather than at publish time.
-  // The unscoped root is exempt: JSR requires @scope/name, so `tsbouncer`
-  // ships to npm only.
-  if (pkg.name === 'tsbouncer') continue;
+  // The kernel is exempt: `@tsbouncer/tsbouncer` ships to npm only, so it
+  // carries no jsr.json.
+  if (pkg.name === '@tsbouncer/tsbouncer') continue;
   let jsr;
   try {
     jsr = read(join(dir, 'jsr.json'));

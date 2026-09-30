@@ -1,5 +1,5 @@
+import type { Authz } from '@tsbouncer/tsbouncer';
 import { Hono } from 'hono';
-import type { Authz } from 'tsbouncer';
 import { caller, type Env, identify, requirePermission } from './auth.js';
 import { assignableRoles, documents, relationForRole } from './data.js';
 import { HttpError, onError } from './http.js';

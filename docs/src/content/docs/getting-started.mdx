@@ -10,7 +10,7 @@ import Callout from '~/components/Callout.astro';
 ## Install
 
 ```bash
-npm i tsbouncer @tsbouncer/in-memory   # kernel plus the process-local backend
+npm i @tsbouncer/tsbouncer @tsbouncer/in-memory   # kernel plus the process-local backend
 ```
 
 `tsbouncer` is the kernel and two ports — nothing else. Backends are separate
@@ -30,7 +30,7 @@ that names a type which does not exist throws immediately, not on the first
 request that happens to use it.
 
 ```ts
-import { defineModel, defineType, permission, relation } from 'tsbouncer';
+import { defineModel, defineType, permission, relation } from '@tsbouncer/tsbouncer';
 
 const model = defineModel({
   types: {
@@ -52,7 +52,7 @@ const model = defineModel({
 ## Connect a store
 
 ```ts
-import { createAuthz } from 'tsbouncer';
+import { createAuthz } from '@tsbouncer/tsbouncer';
 import { memoryStore } from '@tsbouncer/in-memory';
 
 const authz = createAuthz({ model, store: memoryStore() });
@@ -85,7 +85,7 @@ The library has no opinion about your framework, so this is the whole
 integration:
 
 ```ts ts-skip
-import { isAuthorizationError } from 'tsbouncer';
+import { isAuthorizationError } from '@tsbouncer/tsbouncer';
 
 app.get('/api/documents/:id', async (req, res) => {
   const subject = `user:${req.header('x-user-id')}`;

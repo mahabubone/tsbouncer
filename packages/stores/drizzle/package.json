@@ -51,7 +51,7 @@
     "drizzle-orm": ">=0.45.0 <0.46"
   },
   "dependencies": {
-    "tsbouncer": "workspace:*"
+    "@tsbouncer/tsbouncer": "workspace:*"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",

@@ -24,7 +24,7 @@ The library has no idea who is asking, and that is where your session lives.
 
 ```ts ts-skip
 import { type Request } from 'express';
-import { type Authz } from 'tsbouncer';
+import { type Authz } from '@tsbouncer/tsbouncer';
 
 function callerOf(req: Request) {
   const userId = req.header('x-user-id');

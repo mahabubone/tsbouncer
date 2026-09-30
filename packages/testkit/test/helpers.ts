@@ -8,7 +8,7 @@ import {
   type TupleStore,
   tupleKey,
   type WriteInput,
-} from 'tsbouncer';
+} from '@tsbouncer/tsbouncer';
 
 /**
  * A minimal, honest store: an array, a key, and `matchesQuery`.

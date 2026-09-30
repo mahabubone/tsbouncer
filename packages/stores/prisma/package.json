@@ -51,7 +51,7 @@
     "@prisma/client": ">=7.0 <8"
   },
   "dependencies": {
-    "tsbouncer": "workspace:*"
+    "@tsbouncer/tsbouncer": "workspace:*"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",

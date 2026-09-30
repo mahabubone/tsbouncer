@@ -6,9 +6,9 @@ Define authorization data, relationships, and policies. `tsbouncer` evaluates ac
 — over pluggable storage, inside your application.
 
 > **Status: preview.** Nothing is published yet — `1.0.0-preview.1` is
-> staged. One `tsbouncer` package (kernel plus `memory`/`json`/`defaults`
-> subpaths), three SQL store plugins, the conformance suite, a complete check
-> engine, and the three graph queries are built and tested. See
+> staged. One `@tsbouncer/tsbouncer` kernel package, eight `@tsbouncer/*` adapter
+> and conformance packages, a complete check engine, and the three graph queries
+> are built and tested. See
 > [PLAN.md](./PLAN.md) for the breakdown.
 
 ## Why
@@ -99,7 +99,7 @@ built at runtime. The model is still known statically, so the legal values are
 derivable:
 
 ```ts
-import type { ModelShapeOf, ObjectRefOf, PermissionOf, SubjectRefOf } from 'tsbouncer';
+import type { ModelShapeOf, ObjectRefOf, PermissionOf, SubjectRefOf } from '@tsbouncer/tsbouncer';
 import { model } from './model.js';
 
 type Shape = ModelShapeOf<typeof model>;
@@ -164,7 +164,7 @@ const { allOfTypes, members, excluded } = await authz.listSubjects({
 ```
 
 ```ts
-import { defineModel, defineType, permission, relation } from 'tsbouncer';
+import { defineModel, defineType, permission, relation } from '@tsbouncer/tsbouncer';
 import { createDefaultAuthz } from '@tsbouncer/defaults';
 
 const authz = createDefaultAuthz({ model });        // in-memory
@@ -270,7 +270,7 @@ Not published yet — `1.0.0-preview.1` is staged in this repo, not shipped.
 When it is:
 
 ```bash
-npm i tsbouncer @tsbouncer/in-memory   # kernel plus the process-local backend
+npm i @tsbouncer/tsbouncer @tsbouncer/in-memory   # kernel plus the process-local backend
 ```
 
 ## Examples

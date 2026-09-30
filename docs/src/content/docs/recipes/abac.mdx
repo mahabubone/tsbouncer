@@ -32,7 +32,7 @@ bound live on the tuple, so tuples still serialize cleanly and a store never
 evaluates anything.
 
 ```ts setup
-import { createAuthz, defineCondition, defineModel, defineType, formatExplain, permission, relation } from 'tsbouncer';
+import { createAuthz, defineCondition, defineModel, defineType, formatExplain, permission, relation } from '@tsbouncer/tsbouncer';
 import { memoryStore } from '@tsbouncer/in-memory';
 
 const model = defineModel({

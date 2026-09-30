@@ -14,7 +14,7 @@ A model says what a *shape* of access is. Data says who holds it. The engine is
 what connects them.
 
 ```ts setup
-import { createAuthz, defineModel, defineType, permission, relation, wildcard } from 'tsbouncer';
+import { createAuthz, defineModel, defineType, permission, relation, wildcard } from '@tsbouncer/tsbouncer';
 import { memoryStore } from '@tsbouncer/in-memory';
 
 const model = defineModel({
@@ -94,7 +94,7 @@ Or the reason, which is the one nobody expects to need and everybody ends up
 needing:
 
 ```ts
-import { formatExplain } from 'tsbouncer';
+import { formatExplain } from '@tsbouncer/tsbouncer';
 
 const result = await authz.explain({
   subject: 'user:bob',

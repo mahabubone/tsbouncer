@@ -10,7 +10,7 @@ import Callout from '~/components/Callout.astro';
 
 ```ts setup
 import { expect, it, beforeEach, describe } from 'vitest';
-import type { Cache, TupleStore } from 'tsbouncer';
+import type { Cache, TupleStore } from '@tsbouncer/tsbouncer';
 
 declare function myStore(): TupleStore;
 ```
@@ -71,7 +71,7 @@ The model is the thing worth testing, and it is ordinary code. `memoryStore` is
 process-local, so each test gets a clean graph with no teardown.
 
 ```ts
-import { createAuthz, defineModel, defineType, permission, relation } from 'tsbouncer';
+import { createAuthz, defineModel, defineType, permission, relation } from '@tsbouncer/tsbouncer';
 import { memoryStore } from '@tsbouncer/in-memory';
 
 const model = defineModel({

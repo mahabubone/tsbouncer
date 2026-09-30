@@ -193,7 +193,7 @@ dependency-kernel order (`defaults` is last on purpose — see below). The
 subshell keeps the `cd` from leaking into your shell; the `|| break` stops the
 loop on the first failure. Publish in this order:
 
-1. `tsbouncer` — the kernel; everything else installs it
+1. `@tsbouncer/tsbouncer` — the kernel; everything else installs it
 2. `@tsbouncer/testkit` — peers on the kernel
 3. `@tsbouncer/in-memory`, `@tsbouncer/json-file`, `@tsbouncer/redis`,
    `@tsbouncer/kysely`, `@tsbouncer/drizzle`, `@tsbouncer/prisma` — adapters,
@@ -219,8 +219,8 @@ npm view @tsbouncer/redis@preview version
 ### 7. JSR, one scoped package at a time
 
 Each scoped package carries a `jsr.json` (checked by `pnpm versions` for name
-and version drift). The unscoped root `tsbouncer` is npm-only — JSR requires
-`@scope/name`, so there is nothing to configure there:
+and version drift). The root `@tsbouncer/tsbouncer` is npm-only — it ships no
+`jsr.json`, so there is nothing to configure there:
 
 ```json
 {

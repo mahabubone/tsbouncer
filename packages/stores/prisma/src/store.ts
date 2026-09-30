@@ -6,8 +6,8 @@ import type {
   TupleStore,
   TupleStoreCapabilities,
   WriteInput,
-} from 'tsbouncer';
-import { formatRef, parseRef, StoreError } from 'tsbouncer';
+} from '@tsbouncer/tsbouncer';
+import { formatRef, parseRef, StoreError } from '@tsbouncer/tsbouncer';
 import { DEFAULT_MODEL, KEY_FIELDS, NULL_ABSENT } from './schema.js';
 
 export { DEFAULT_MODEL, KEY_FIELDS, MODEL_DDL, NULL_ABSENT } from './schema.js';

@@ -1,5 +1,5 @@
 {
-  "name": "tsbouncer",
+  "name": "@tsbouncer/tsbouncer",
   "version": "1.0.0-preview.1",
   "description": "Authorization graph SDK for TypeScript ESM apps. Kernel and ports at the root; stores and caches are separate adapter packages.",
   "license": "Apache-2.0",

@@ -1,4 +1,4 @@
-import type { Tuple, TupleStore } from 'tsbouncer';
+import type { Tuple, TupleStore } from '@tsbouncer/tsbouncer';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 export interface ConformanceOptions {

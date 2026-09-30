@@ -22,7 +22,7 @@ A condition has two halves of input, and keeping them apart is the whole idea.
 | what the **caller** knows now | the request | `callerRegion: 'us'` — not in the store at all |
 
 ```ts setup
-import { createAuthz, defineCondition, defineModel, defineType, formatExplain, permission, relation } from 'tsbouncer';
+import { createAuthz, defineCondition, defineModel, defineType, formatExplain, permission, relation } from '@tsbouncer/tsbouncer';
 import { memoryStore } from '@tsbouncer/in-memory';
 
 const model = defineModel({

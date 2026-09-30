@@ -9,7 +9,7 @@ kind: guide
 import Callout from '~/components/Callout.astro';
 
 ```ts setup
-import { createAuthz } from 'tsbouncer';
+import { createAuthz } from '@tsbouncer/tsbouncer';
 import { kyselyStore } from '@tsbouncer/kysely';
 import type {
   Cache,
@@ -19,7 +19,7 @@ import type {
   Tuple,
   TupleStore,
   WriteInput,
-} from 'tsbouncer';
+} from '@tsbouncer/tsbouncer';
 import type { Kysely } from 'kysely';
 import { cacheConformance, storeConformance } from '@tsbouncer/testkit';
 

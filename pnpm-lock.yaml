@@ -60,6 +60,9 @@ importers:
       '@tsbouncer/testkit':
         specifier: workspace:*
         version: link:../packages/testkit
+      '@tsbouncer/tsbouncer':
+        specifier: workspace:*
+        version: link:../packages/tsbouncer
       '@types/node':
         specifier: 24.10.1
         version: 24.10.1
@@ -69,9 +72,6 @@ importers:
       tailwindcss:
         specifier: 4.3.3
         version: 4.3.3
-      tsbouncer:
-        specifier: workspace:*
-        version: link:../packages/tsbouncer
       tsx:
         specifier: 4.23.15
         version: 4.23.15
@@ -87,6 +87,9 @@ importers:
       '@tsbouncer/drizzle':
         specifier: workspace:*
         version: link:../../packages/stores/drizzle
+      '@tsbouncer/tsbouncer':
+        specifier: workspace:*
+        version: link:../../packages/tsbouncer
       better-sqlite3:
         specifier: 13.0.3
         version: 13.0.3
@@ -96,9 +99,6 @@ importers:
       express:
         specifier: 5.2.1
         version: 5.2.1
-      tsbouncer:
-        specifier: workspace:*
-        version: link:../../packages/tsbouncer
     devDependencies:
       '@types/better-sqlite3':
         specifier: 7.6.13
@@ -130,12 +130,12 @@ importers:
       '@tsbouncer/json-file':
         specifier: workspace:*
         version: link:../../packages/stores/json-file
+      '@tsbouncer/tsbouncer':
+        specifier: workspace:*
+        version: link:../../packages/tsbouncer
       hono:
         specifier: 4.13.11
         version: 4.13.11
-      tsbouncer:
-        specifier: workspace:*
-        version: link:../../packages/tsbouncer
     devDependencies:
       '@types/node':
         specifier: 26.6.3
@@ -161,7 +161,7 @@ importers:
       '@tsbouncer/json-file':
         specifier: workspace:*
         version: link:../json-file
-      tsbouncer:
+      '@tsbouncer/tsbouncer':
         specifier: workspace:*
         version: link:../../tsbouncer
     devDependencies:
@@ -189,7 +189,7 @@ importers:
 
   packages/stores/drizzle:
     dependencies:
-      tsbouncer:
+      '@tsbouncer/tsbouncer':
         specifier: workspace:*
         version: link:../../tsbouncer
     devDependencies:
@@ -229,7 +229,7 @@ importers:
 
   packages/stores/in-memory:
     dependencies:
-      tsbouncer:
+      '@tsbouncer/tsbouncer':
         specifier: workspace:*
         version: link:../../tsbouncer
     devDependencies:
@@ -260,7 +260,7 @@ importers:
 
   packages/stores/json-file:
     dependencies:
-      tsbouncer:
+      '@tsbouncer/tsbouncer':
         specifier: workspace:*
         version: link:../../tsbouncer
     devDependencies:
@@ -291,7 +291,7 @@ importers:
 
   packages/stores/kysely:
     dependencies:
-      tsbouncer:
+      '@tsbouncer/tsbouncer':
         specifier: workspace:*
         version: link:../../tsbouncer
     devDependencies:
@@ -334,7 +334,7 @@ importers:
 
   packages/stores/prisma:
     dependencies:
-      tsbouncer:
+      '@tsbouncer/tsbouncer':
         specifier: workspace:*
         version: link:../../tsbouncer
     devDependencies:
@@ -377,7 +377,7 @@ importers:
 
   packages/stores/redis:
     dependencies:
-      tsbouncer:
+      '@tsbouncer/tsbouncer':
         specifier: workspace:*
         version: link:../../tsbouncer
     devDependencies:
@@ -408,7 +408,7 @@ importers:
 
   packages/testkit:
     dependencies:
-      tsbouncer:
+      '@tsbouncer/tsbouncer':
         specifier: workspace:*
         version: link:../tsbouncer
     devDependencies:

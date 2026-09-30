@@ -27,7 +27,7 @@ A document names a tenant, never a person. Membership lives on the tenant, and t
 permission reaches it by walking the edge.
 
 ```ts setup
-import { createAuthz, defineModel, defineType, permission, relation, ttu } from 'tsbouncer';
+import { createAuthz, defineModel, defineType, permission, relation, ttu } from '@tsbouncer/tsbouncer';
 import { memoryStore } from '@tsbouncer/in-memory';
 
 const model = defineModel({

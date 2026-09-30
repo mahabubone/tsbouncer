@@ -9,7 +9,7 @@ import {
   type TupleStore,
   ttu,
   wildcard,
-} from 'tsbouncer';
+} from '@tsbouncer/tsbouncer';
 import { expect } from 'vitest';
 
 /**

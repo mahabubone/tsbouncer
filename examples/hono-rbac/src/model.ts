@@ -1,4 +1,4 @@
-import { defineModel, defineType, permission, relation } from 'tsbouncer';
+import { defineModel, defineType, permission, relation } from '@tsbouncer/tsbouncer';
 
 /**
  * Role-based access control, and nothing else.

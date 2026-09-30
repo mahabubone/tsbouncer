@@ -9,9 +9,9 @@ kind: reference
 import Callout from '~/components/Callout.astro';
 
 ```ts setup
-import { createAuthz, defineModel, defineType, permission, relation } from 'tsbouncer';
+import { createAuthz, defineModel, defineType, permission, relation } from '@tsbouncer/tsbouncer';
 import { memoryStore } from '@tsbouncer/in-memory';
-import type { Authz, CheckRequest } from 'tsbouncer';
+import type { Authz, CheckRequest } from '@tsbouncer/tsbouncer';
 
 const model = defineModel({
   types: {
@@ -35,7 +35,7 @@ Every public error extends `AuthorizationError` and carries a stable `code`, so 
 application can branch on it without matching on messages.
 
 ```ts
-import { isAuthorizationError } from 'tsbouncer';
+import { isAuthorizationError } from '@tsbouncer/tsbouncer';
 
 try {
   await authz.assert(request);

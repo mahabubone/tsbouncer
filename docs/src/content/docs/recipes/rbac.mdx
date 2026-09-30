@@ -19,7 +19,7 @@ A `role` is a type whose `holder` relation is the assignment, and a userset edge
 how a resource picks up "everyone holding that role".
 
 ```ts setup
-import { createAuthz, defineModel, defineType, permission, relation } from 'tsbouncer';
+import { createAuthz, defineModel, defineType, permission, relation } from '@tsbouncer/tsbouncer';
 import { memoryStore } from '@tsbouncer/in-memory';
 
 const model = defineModel({

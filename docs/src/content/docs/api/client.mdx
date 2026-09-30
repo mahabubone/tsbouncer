@@ -12,9 +12,9 @@ import Callout from '~/components/Callout.astro';
 example on this page runs against this setup:
 
 ```ts setup
-import { createAuthz, defineModel, defineType, isAuthorizationError, permission, relation } from 'tsbouncer';
+import { createAuthz, defineModel, defineType, isAuthorizationError, permission, relation } from '@tsbouncer/tsbouncer';
 import { memoryStore } from '@tsbouncer/in-memory';
-import type { EvaluationLimits, Model, TupleStore } from 'tsbouncer';
+import type { EvaluationLimits, Model, TupleStore } from '@tsbouncer/tsbouncer';
 
 const model = defineModel({
   types: {
@@ -234,7 +234,7 @@ The namespace is required and should be versioned with the model. Two
 applications sharing one cache must never read each other's decisions:
 
 ```ts
-import { withCache } from 'tsbouncer';
+import { withCache } from '@tsbouncer/tsbouncer';
 import { memoryCache } from '@tsbouncer/in-memory';
 
 const cached = withCache(authz, memoryCache(), { namespace: 'docs-api-v1' });

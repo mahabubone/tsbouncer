@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import type { TupleStore } from '@tsbouncer/tsbouncer';
 import { createClient, type RedisClientType } from 'redis';
-import type { TupleStore } from 'tsbouncer';
 import { redisStore } from '../src/index.js';
 
 /**

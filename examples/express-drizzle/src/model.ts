@@ -6,7 +6,7 @@ import {
   relation,
   ttu,
   wildcard,
-} from 'tsbouncer';
+} from '@tsbouncer/tsbouncer';
 
 /**
  * A real system's access model, in one file.

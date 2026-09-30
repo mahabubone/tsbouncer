@@ -7,7 +7,7 @@
 
 | Area | Decision |
 |---|---|
-| Name | `tsbouncer` + `@tsbouncer/*` (both verified free on npm) |
+| Name | `@tsbouncer/tsbouncer` + `@tsbouncer/*` (unscoped `tsbouncer` is blocked by npm's similarity guard against the existing `ts-bouncer`) |
 | License | Apache-2.0, public |
 | Module system | **ESM-only.** No CJS, no dual build. Node `>=22` |
 | Model | Object literal + typed helpers, defined and validated **in code at runtime** |
@@ -137,7 +137,7 @@ interface TupleStore {
 | M3 | TTU traversal (lands the `ttu` node) | **high** |
 | M4 | conditions / ABAC, fail-closed | med |
 | M5 | `jsonStore` (atomic temp+rename) | med |
-| M6 | root `tsbouncer` pkg | low |
+| M6 | root `@tsbouncer/tsbouncer` pkg | low |
 | S1 | `@tsbouncer/kysely` — filtered reads over the app's existing Kysely instance | med |
 | S2 | `@tsbouncer/drizzle` — same, over the app's existing Drizzle instance | med |
 | S3 | `@tsbouncer/prisma` — same, over the app's existing `PrismaClient` | med |
@@ -377,10 +377,10 @@ staged state is marked ready. This phase restructures and stages.
 |---|---|
 | Site | New marketing landing at `/`; all docs under `/docs/*`; current intro becomes `/docs`. Static output, served from GitHub Pages as a **project subpath** (`base: '/tsbouncer/'` under `github.com/mahabubone/tsbouncer`). |
 | Links | Absolute internal links do not survive Astro `base`, so content links go relative, components/layout use `BASE_URL`, and the snippet/link checkers resolve the `/docs/*` routes. |
-| Package | **One `tsbouncer`** (kernel + ports at `.`, backends as plugins; superseded by the ports revamp below, which extracted the `./memory`, `./json`, and `./defaults` subpaths into adapter packages). |
+| Package | **One `@tsbouncer/tsbouncer`** (kernel + ports at `.`, backends as plugins; superseded by the ports revamp below, which extracted the `./memory`, `./json`, and `./defaults` subpaths into adapter packages). |
 | Version | Preview chain `1.0.0-preview.N` (`.1`, `.2`, … — plain numeric identifiers, so precedence stays chronological; month names would sort lexically and break it), single version enforced everywhere as today. The `v` prefix lives on git tags only, never in `package.json`. Final is `1.0.0`. |
 | Deploy | Pages deploy automation is deferred with the other pipes; this phase proves the SSG output (`docs:build` under `base`) and documents the manual publish steps. |
-| Build order | `@tsbouncer/testkit` takes the kernel as a **peer** dependency (one kernel per install, never two), so turbo's `^build` does not order it after `tsbouncer#build` — and `tsbouncer` dev-depends on the testkit for its store suites, so a blanket edge would be a cycle. Each side declares its edge explicitly instead: `packages/testkit/turbo.json` orders its tasks after `tsbouncer#build`, and `packages/tsbouncer/turbo.json` narrows `build` to `dependsOn: []` (the kernel build needs nothing). CI caught the missing edge on a clean tree; local builds had masked it with stale `dist/`. |
+| Build order | `@tsbouncer/testkit` takes the kernel as a **peer** dependency (one kernel per install, never two), so turbo's `^build` does not order it after `@tsbouncer/tsbouncer#build` — and `@tsbouncer/tsbouncer` dev-depends on the testkit for its store suites, so a blanket edge would be a cycle. Each side declares its edge explicitly instead: `packages/testkit/turbo.json` orders its tasks after `@tsbouncer/tsbouncer#build`, and `packages/tsbouncer/turbo.json` narrows `build` to `dependsOn: []` (the kernel build needs nothing). CI caught the missing edge on a clean tree; local builds had masked it with stale `dist/`. |
 | Stores | Focus is InMemory, JSON-file, Redis, SQLite, and PostgreSQL only. **CI stays SQLite-only** — no service containers, ever; `@tsbouncer/redis` and Postgres runs are env-gated local QA (`TSBUNCER_REDIS_URL`, `TSBUNCER_PG_URL`), skipped when unset. **Redis is both roles**: the fast shared store deployments check against hot, and a supported alternate backend — one implementation, Lua-atomic ops over plain index sets, no modules. `watch` stays `false` everywhere until the contract grows a subscription primitive. |
 
 ## Ports revamp — adapters implement ports, the kernel declares them

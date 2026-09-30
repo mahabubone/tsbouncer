@@ -1,7 +1,7 @@
 import { drizzleStore } from '@tsbouncer/drizzle';
+import type { Authz } from '@tsbouncer/tsbouncer';
 import { eq } from 'drizzle-orm';
 import express, { type Express } from 'express';
-import type { Authz } from 'tsbouncer';
 import type { Db } from './db/index.js';
 import { documents, folders, projects, tsbouncerTuples } from './db/schema.js';
 import {

@@ -7,7 +7,7 @@
  * packages, one per port they implement:
  *
  * ```ts
- * import { createAuthz, defineModel, withCache } from 'tsbouncer';
+ * import { createAuthz, defineModel, withCache } from '@tsbouncer/tsbouncer';
  * import { memoryStore, memoryCache } from '@tsbouncer/in-memory';
  * import { jsonStore } from '@tsbouncer/json-file';
  * import { kyselyStore } from '@tsbouncer/kysely';

@@ -1,4 +1,4 @@
-import type { Tuple } from 'tsbouncer';
+import type { Tuple } from '@tsbouncer/tsbouncer';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   drizzleStore,

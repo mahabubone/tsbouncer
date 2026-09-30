@@ -31,7 +31,7 @@ holders, so onboarding someone is one write rather than one per document.
 `src/model.ts`:
 
 ```ts setup
-import { createAuthz, defineModel, defineType, permission, relation, withCache } from 'tsbouncer';
+import { createAuthz, defineModel, defineType, permission, relation, withCache } from '@tsbouncer/tsbouncer';
 import { memoryCache } from '@tsbouncer/in-memory';
 import { jsonStore } from '@tsbouncer/json-file';
 import assert from 'node:assert/strict';
@@ -112,7 +112,7 @@ string and nothing else:
 
 ```ts ts-skip
 import type { Context, MiddlewareHandler } from 'hono';
-import type { Authz } from 'tsbouncer';
+import type { Authz } from '@tsbouncer/tsbouncer';
 
 interface Env {
   readonly Variables: { readonly authz: Authz; readonly subject: string | undefined };

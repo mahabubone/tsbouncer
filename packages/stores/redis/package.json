@@ -51,7 +51,7 @@
     "redis": ">=6.2.0 <7"
   },
   "dependencies": {
-    "tsbouncer": "workspace:*"
+    "@tsbouncer/tsbouncer": "workspace:*"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
