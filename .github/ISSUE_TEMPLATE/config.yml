@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation site
+    url: https://mahabubone.github.io/tsbouncer/
+    about: Concepts, guides, and API reference — most usage questions answer themselves here.
+  - name: Contributing guide
+    url: https://github.com/mahabubone/tsbouncer/blob/main/CONTRIBUTING.md
+    about: Setup, gates, store authoring, and the Hacktoberfest workflow.

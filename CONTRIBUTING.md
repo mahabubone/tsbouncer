@@ -3,6 +3,9 @@
 Thanks for your interest. This is a young, pre-1.0 library and the design is still
 moving, so expect the API to shift.
 
+Everyone here is covered by the [Code of Conduct](./CODE_OF_CONDUCT.md). Read it
+once; it is short and it applies in issues, PRs, and reviews.
+
 ## Before you start
 
 Read [PLAN.md](./PLAN.md) for the current design and [AGENTS.md](./AGENTS.md) for the
@@ -87,6 +90,26 @@ all three are.
   test.
 - Keep inline comments out of the code. Explain *why* in `PLAN.md` or `docs/`.
 - Conventional Commits, please — the changelog is generated from them.
+
+## Contributing during Hacktoberfest
+
+October brings drive-by traffic, so the workflow is explicit. Outside October the
+same bar applies, minus the labels.
+
+1. **Pick from the labeled queue.** Work comes from issues carrying
+   `hacktoberfest` (or `good first issue` for a first contribution). Comment on
+   the issue to claim it and wait for a maintainer's acknowledgement before
+   writing code — two PRs for one issue wastes one of them.
+2. **Meet the bar.** The [pull-request checklist](./.github/PULL_REQUEST_TEMPLATE.md)
+   is the bar: `pnpm check` green, tests for new behavior, no kernel
+   dependencies, `PLAN.md` + README updated for public API changes.
+3. **Do not self-label.** Maintainers apply `hacktoberfest-accepted` when a PR
+   merges. Adding the label yourself does not count and will be removed.
+4. **What gets closed.** PRs with no linked issue, PRs that ignore the PR
+   checklist, automated low-effort edits, and anything that contradicts
+   `AGENTS.md` without a prior `PLAN.md` discussion are closed as `spam` or
+   `invalid` with one pointer back here. A framework adapter or a store-level
+   `check()` fast path will always be declined — see "Before you start".
 
 ## Commit messages
 

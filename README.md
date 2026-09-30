@@ -297,6 +297,16 @@ Both are the source of truth for the [guides](https://tsbouncer.dev/docs/guides)
 test in this repository fails if a guide's link to one of their files stops
 resolving.
 
+## Contributing
+
+Pre-1.0, well-scoped help moves this library faster than anything else. Start
+with issues labeled
+[`good first issue`](https://github.com/mahabubone/tsbouncer/labels/good%20first%20issue)
+or [`hacktoberfest`](https://github.com/mahabubone/tsbouncer/labels/hacktoberfest),
+read [CONTRIBUTING.md](./CONTRIBUTING.md) for the bar (green `pnpm check`, tests,
+no kernel dependencies), and note the [Code of Conduct](./CODE_OF_CONDUCT.md).
+Claim an issue with a comment before writing code.
+
 ## What this library guarantees
 
 Every claim below is a clause in a contract, checked against a real store on every
